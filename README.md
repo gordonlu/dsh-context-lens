@@ -1,10 +1,10 @@
-# dsh-context-lens
-
-Request Context Profiler for DeepSeek Harness — see what changed between model requests, and how cache reuse changed with it.
-
 <p align="center">
   <img src="assets/banner.png" alt="dsh-context-lens" width="100%" />
 </p>
+
+# dsh-context-lens
+
+Request Context Profiler for DeepSeek Harness — see what changed between model requests, and how cache reuse changed with it.
 
 ## What it is
 

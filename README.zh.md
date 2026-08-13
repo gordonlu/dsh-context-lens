@@ -1,10 +1,10 @@
-# dsh-context-lens
-
-DeepSeek Harness 请求上下文分析器 — 看清每次模型请求之间发生了什么变化，以及缓存复用如何随之改变。
-
 <p align="center">
   <img src="assets/banner.png" alt="dsh-context-lens" width="100%" />
 </p>
+
+# dsh-context-lens
+
+DeepSeek Harness 请求上下文分析器 — 看清每次模型请求之间发生了什么变化，以及缓存复用如何随之改变。
 
 ## 这是什么
 

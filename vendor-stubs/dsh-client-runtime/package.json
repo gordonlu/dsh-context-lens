@@ -1,0 +1,19 @@
+{
+  "name": "@deepseek-ai/dsh-client-runtime",
+  "version": "0.0.1-rc.1",
+  "description": "Type-only dev-time vendored snapshot of the published @deepseek-ai/dsh-client-runtime@0.0.1-rc.1 (lib/types only). The npm package declares @deepseek-ai/dsh-compact as a runtime dependency, but that package is not on any registry, so the package cannot be installed. dsh-context-lens consumes only types from './client' (the useProjection framework seat and ClientContext), never values, so a sanitized type-only copy satisfies the compiler; see IMPLEMENTATION_NOTES.md 'npm snapshot gaps'.",
+  "license": "MIT",
+  "type": "module",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts"
+    }
+  }
+}

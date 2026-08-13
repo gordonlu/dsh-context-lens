@@ -1,0 +1,21 @@
+{
+    "version":  "0.0.1-rc.1",
+    "name":  "@deepseek-ai/dsh-client-locale",
+    "types":  "lib/types/index.d.ts",
+    "description":  "Type-only dev-time vendored snapshot of the published @deepseek-ai/dsh-client-locale@0.0.1-rc.1 (lib/types only). The npm snapshot declares unpublished dependencies/peers (@deepseek-ai/dsh-compact, @deepseek-ai/dsh-type-meta), so the package cannot be installed; dsh-context-lens consumes only types, never values; see IMPLEMENTATION_NOTES.md \u0027npm snapshot gaps\u0027.",
+    "exports":  {
+                    "./client":  {
+                                     "types":  "./lib/types/client/index.d.ts"
+                                 },
+                    "./package.json":  "./package.json",
+                    "./invariant":  {
+                                        "types":  "./lib/types/invariant.d.ts"
+                                    },
+                    "./src/*":  "./src/*",
+                    ".":  {
+                              "types":  "./lib/types/index.d.ts"
+                          }
+                },
+    "type":  "module",
+    "license":  "MIT"
+}

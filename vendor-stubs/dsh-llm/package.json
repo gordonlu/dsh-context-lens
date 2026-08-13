@@ -1,0 +1,29 @@
+{
+    "version":  "0.0.1-rc.1",
+    "name":  "@deepseek-ai/dsh-llm",
+    "types":  "lib/types/index.d.ts",
+    "description":  "Type-only dev-time vendored snapshot of the published @deepseek-ai/dsh-llm@0.0.1-rc.1 (lib/types only). The npm snapshot declares unpublished dependencies/peers (@deepseek-ai/dsh-compact, @deepseek-ai/dsh-type-meta), so the package cannot be installed; dsh-context-lens consumes only types, never values; see IMPLEMENTATION_NOTES.md \u0027npm snapshot gaps\u0027.",
+    "exports":  {
+                    "./types":  {
+                                    "types":  "./lib/types/types.d.ts"
+                                },
+                    ".":  {
+                              "types":  "./lib/types/index.d.ts",
+                              "import":  "./runtime.js",
+                              "default":  "./runtime.js"
+                          },
+                    "./brand":  {
+                                    "types":  "./lib/types/brand.d.ts"
+                                },
+                    "./invariant":  {
+                                        "types":  "./lib/types/invariant.d.ts"
+                                    },
+                    "./package.json":  "./package.json",
+                    "./src/*":  "./src/*",
+                    "./message":  {
+                                      "types":  "./lib/types/message.d.ts"
+                                  }
+                },
+    "type":  "module",
+    "license":  "MIT"
+}

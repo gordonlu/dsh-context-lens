@@ -1,0 +1,8 @@
+# The dsh-context-lens bundle patch: one row mounts the server half, whose
+# package.json `dsh.client` declaration makes the browser half visible to the
+# client-modules roster (the scan keys off Loader entry names, so a single
+# row serves both halves). Applied after dsh-web-app's layer.
+
+- insert:
+    - id: context-lens
+      name: dsh-context-lens

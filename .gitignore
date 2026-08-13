@@ -1,0 +1,6 @@
+# research clone
+dsh-main/
+
+node_modules/
+dist/
+*.tsbuildinfo

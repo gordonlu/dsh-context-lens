@@ -2,6 +2,10 @@
 
 DeepSeek Harness 请求上下文分析器 — 看清每次模型请求之间发生了什么变化，以及缓存复用如何随之改变。
 
+<p align="center">
+  <img src="assets/banner.png" alt="dsh-context-lens" width="100%" />
+</p>
+
 ## 这是什么
 
 `dsh-context-lens` 是 DeepSeek Harness 插件（服务端单元 + 客户端视图），持续回答一个问题：**"这次发给模型的内容是什么，与上一次请求相比变了什么？"** 它是纯粹的观察者——只读取会话日志，不写入任何事件，也不触碰任何模型调用。

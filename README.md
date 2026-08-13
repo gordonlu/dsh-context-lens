@@ -2,6 +2,10 @@
 
 Request Context Profiler for DeepSeek Harness — see what changed between model requests, and how cache reuse changed with it.
 
+<p align="center">
+  <img src="assets/banner.png" alt="dsh-context-lens" width="100%" />
+</p>
+
 ## What it is
 
 `dsh-context-lens` is a DeepSeek Harness plugin (server unit + client view) that answers one question continuously: **"what did the harness send the model this time, and what changed since the last request?"** It is a pure observer — it reads the session log, adds nothing to it, and never touches a model call.

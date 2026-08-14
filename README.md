@@ -14,6 +14,16 @@ Request Context Profiler for DeepSeek Harness — see what changed between model
   <img src="assets/dsh-context-lens.png" alt="dsh-context-lens dashboard" width="100%" />
 </p>
 
+## Quick start
+
+```sh
+dsh plugin --profile web add dsh-context-lens
+```
+
+Open any conversation, switch to the **Request Context** tab, and watch every
+model request get one line: what changed vs the previous request, and how
+cache reuse moved with it.
+
 For every real LLM request it records one compact card:
 
 - **Request identity** — turn:step, provider, model, context window, status (completed / failed / aborted).
@@ -43,7 +53,7 @@ Everything on the left is genuinely observable; nothing on the right is ever cla
 
 ## Architecture
 
-**Server** — one pure, replayable projection (`contextLens`) folds the session log: `request/header` events (epoch-logged, committed only on change) define the snapshot in force at each `step/start`; a header landing inside the step replaces it (that is the header the provider actually saw). `step/end` marks the span closed; finalization happens at `turn/end` for the last step, at the next `step/start` for intermediate steps, and crash-orphaned logs close as failed. Retries never mint new records. Uninteresting events return the same state reference — the registry's zero-work `Object.is` gate.
+**Server** — one pure, replayable projection (`contextLens`) folds the session log: `request/header` events (epoch-logged, committed only on change) define the snapshot in force at each `step/start`; a header landing inside the step replaces it (that is the header the provider actually saw). `step/end` marks the span closed; finalization happens at `turn/end` for the last step, at the next `step/start` for intermediate steps, and crash-orphaned logs close as failed. Retries do not mint new records (mainline retries inside the same step; the fold also splits cleanly if a future mainline opens a fresh turn). Uninteresting events return the same state reference — the registry's zero-work `Object.is` gate.
 
 **Replay consistency is a tested invariant**: folding the log incrementally (live) and folding the same log from `init` (replay) produce identical state and projection.
 
@@ -86,8 +96,8 @@ cordis.patch.yml     dsh bundle patch metadata
 ## Roadmap
 
 - Retained-window cursor to inspect older requests than 100.
-- Optional per-request raw header inspector (committed JSON, collapsible).
 - Correlation drill-down: group drops by (model, provider, tool-set hash) across the window.
+- Distinguish session-level counters from the retained window in the status strip (a drop at #127 must not read as "recent 100 are clean").
 
 ## License
 

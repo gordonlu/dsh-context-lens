@@ -14,6 +14,14 @@ DeepSeek Harness 请求上下文分析器 — 看清每次模型请求之间发�
   <img src="assets/dsh-context-lens.png" alt="dsh-context-lens 仪表盘" width="100%" />
 </p>
 
+## 快速开始
+
+```sh
+dsh plugin --profile web add dsh-context-lens
+```
+
+打开任意会话，切到 **请求上下文** 标签页，每个模型请求都会以一行呈现：相对上次请求变了什么，缓存复用如何随之变化。
+
 对每个真实 LLM 请求记录一张紧凑卡片：
 
 - **请求身份** — turn:step、服务商、模型、上下文窗口、状态（完成 / 失败 / 中止）。
@@ -86,8 +94,8 @@ cordis.patch.yml    dsh bundle patch 元数据
 ## 路线图
 
 - 保留窗口游标，可查看 100 条之外的旧请求。
-- 可选的单请求原始 header 检查器（可折叠的已提交 JSON）。
 - 相关性下钻：按（模型、服务商、工具集哈希）在窗口内分组统计回落。
+- 状态条区分"会话级计数"与"保留窗口"（#127 的回落不应显示为"最近 100 条干净"）。
 
 ## 许可
 

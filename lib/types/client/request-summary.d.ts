@@ -48,5 +48,11 @@ export declare function globalOrdinal(index: number, length: number, totalReques
  * @returns true when tools/system/config/model/provider changed or the cache dropped.
  */
 export declare function structurallyChanged(request: RequestRecord): boolean;
-/** Whether a request counts as "unchanged" for the list filter (stable + completed). */
+/**
+ * Whether a request is "unchanged" for the list filter. The definition must
+ * match the tag computation exactly: a stable tag is hideable; ANY other tag
+ * — including significant surface growth — is interesting. A request with a
+ * +17.6K context jump but no structural change must NOT vanish under the
+ * default filter; the whole point of the lens is surfacing it.
+ */
 export declare function isUnchanged(request: RequestRecord): boolean;

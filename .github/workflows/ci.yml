@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly compatibility against the DeepSeek Harness mainline — the
+    # biggest risk for this plugin is mainline API drift, not self-regression.
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # Real-package smokes against a fresh DeepSeek Harness checkout. Runs on
+  # schedule/manual; if the harness is not publicly cloneable, install a
+  # HARNESS_REPO_PAT secret (any token that can read it) and the job uses it.
+  compatibility:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      HARNESS: ${{ github.workspace }}/deepseek-harness
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+      - name: Clone DeepSeek Harness
+        run: |
+          if [ -n "${{ secrets.HARNESS_REPO_PAT }}" ]; then
+            git clone --depth 1 \
+              "https://x-access-token:${{ secrets.HARNESS_REPO_PAT }}@github.com/deepseek-ai/deepseek-harness.git" \
+              "$HARNESS" && echo "HARNESS_OK=1" >> "$GITHUB_ENV"
+          else
+            git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git \
+              "$HARNESS" && echo "HARNESS_OK=1" >> "$GITHUB_ENV"
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install harness dependencies
+        if: env.HARNESS_OK == '1'
+        working-directory: ${{ env.HARNESS }}
+        run: pnpm install --frozen-lockfile
+      - name: Server smoke (real harness packages)
+        if: env.HARNESS_OK == '1'
+        working-directory: ${{ env.HARNESS }}
+        run: ./node_modules/.bin/tsx --tsconfig tsconfig.json ../plugin/smoke/server-smoke.mts
+      - name: Client ABI smoke (real loader table)
+        if: env.HARNESS_OK == '1'
+        working-directory: ${{ env.HARNESS }}
+        run: DSH_SMOKE_HARNESS="$HARNESS" ./node_modules/.bin/tsx --tsconfig tsconfig.json ../plugin/smoke/client-smoke.mts

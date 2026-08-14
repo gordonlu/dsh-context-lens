@@ -93,6 +93,29 @@ describe('contextLens projection: request lifecycle', () => {
     expect(view.latest!.usage).toEqual(usage(100, 50))
   })
 
+  it('splits records when a retry opens a fresh turn (defensive: future-mainline shape)', () => {
+    // Current DSH mainline retries INSIDE the same step (the agent loop
+    // re-dispatches on `agent/request-error` with the same turn/step, so
+    // chunks and the final message carry identical {turn, step} — one
+    // record). The llm-retry README describes a fresh-turn shape; if
+    // mainline ever moves there, the fold must naturally split at the new
+    // step/start instead of merging attempts.
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      ev('assistant/chunk', { turn: 1, step: 1, chunk: streamChunkUsage(usage(50, 5)) }, { seq: 3 }),
+      ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
+      endTurn(5, 1, 'error'),
+      // Attempt 2: fresh turn, fresh step.
+      startStep(2, 1, 6),
+      message(7, 2, 1, usage(100, 50)),
+      endTurn(8, 2),
+    ])
+    expect(view.recentRequests.map(r => `${r.id}:${r.status}`)).toEqual(['1:1:failed', '2:1:completed'])
+    expect(view.summary.totalRequests).toBe(2)
+    expect(view.summary.cacheDrops).toBe(0)
+  })
+
   it('marks aborted and failed turns without a message', () => {
     const aborted = foldProjection([
       startStep(1, 1, 1),

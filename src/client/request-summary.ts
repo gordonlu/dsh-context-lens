@@ -107,7 +107,16 @@ export function structurallyChanged(request: RequestRecord): boolean {
   )
 }
 
-/** Whether a request counts as "unchanged" for the list filter (stable + completed). */
+/**
+ * Whether a request is "unchanged" for the list filter. The definition must
+ * match the tag computation exactly: a stable tag is hideable; ANY other tag
+ * — including significant surface growth — is interesting. A request with a
+ * +17.6K context jump but no structural change must NOT vanish under the
+ * default filter; the whole point of the lens is surfacing it.
+ */
 export function isUnchanged(request: RequestRecord): boolean {
-  return request.status === 'completed' && !structurallyChanged(request)
+  if (request.status !== 'completed') return false
+  if (structurallyChanged(request)) return false
+  const delta = request.diffFromPrevious?.surface.estimatedDeltaTokens
+  return delta === undefined || delta < SURFACE_TAG_MIN_DELTA
 }

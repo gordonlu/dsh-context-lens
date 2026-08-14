@@ -216,6 +216,14 @@ async function main(): Promise<number> {
   const echoDispose = ctx.tools.register(echo)
   const agent = ctx.agentLoop.create(SessionId('lens-smoke'), { provider: 'mock', model: 'mock' })
 
+  // Companion invariant plugin: mountable against the real invariants
+  // service and registers the package name (no-op install).
+  const invariants = (await import('@deepseek-ai/dsh-invariants')).default
+  await ctx.plugin(invariants)
+  const invariantExports = await import('../lib/invariant.js')
+  await ctx.plugin({ name: invariantExports.name, inject: invariantExports.inject, apply: invariantExports.apply } as never)
+  check('invariant companion mounts against the real invariants service', true)
+
   // Turn 1 — baseline.
   await drive(ctx, agent, 'first turn')
   // Turn 2 — one tool call + follow-up step (two records in one turn).
@@ -337,11 +345,11 @@ async function main(): Promise<number> {
   let checkpointOk = false
   try {
     const rows = ctx.sessionProjections.checkpoint(agent.session)
-    checkpointOk = rows['contextLens']?.ver === 1 && rows['contextLens']?.seq === agent.session.seq - 1
+    checkpointOk = rows['contextLens']?.ver === 2 && rows['contextLens']?.seq === agent.session.seq - 1
   } catch (error) {
     console.log(`    checkpoint threw: ${String(error)}`)
   }
-  check('checkpoint row exists with stateVersion 1 at the current watermark', checkpointOk)
+  check('checkpoint row exists with stateVersion 2 at the current watermark', checkpointOk)
 
   sectionDispose()
   echoDispose()

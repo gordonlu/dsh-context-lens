@@ -384,5 +384,6 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
       structuralChanges: state.structuralChanges,
     },
   }),
-  stateVersion: 1,
+  // 2: schemaBytes is UTF-8 byte length (was JS string length).
+  stateVersion: 2,
 }

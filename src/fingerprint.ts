@@ -121,12 +121,17 @@ export const EMPTY_HEADER: HeaderFingerprint = { configHash: '', tools: [] }
  */
 export function fingerprintHeader(header: EpochHeader | undefined): HeaderFingerprint {
   if (header === undefined) return EMPTY_HEADER
-  const tools = (header.tools ?? []).map((schema): ToolFingerprint => ({
-    name: schema.name,
-    schemaHash: hashValue(schema),
-    schemaBytes: canonicalJson(schema).length,
-    estimatedTokens: estimateSchemaTokens(schema),
-  }))
+  const tools = (header.tools ?? []).map((schema): ToolFingerprint => {
+    const canonical = canonicalJson(schema)
+    return {
+      name: schema.name,
+      schemaHash: hashText(canonical),
+      // UTF-8 byte length, not JS string length — CJK-heavy schemas must not
+      // under-report (persisted state semantics; bump stateVersion on change).
+      schemaBytes: Buffer.byteLength(canonical, 'utf8'),
+      estimatedTokens: estimateSchemaTokens(schema),
+    }
+  })
   return {
     configHash: hashValue(header.config),
     ...header.config.provider === undefined ? {} : { provider: header.config.provider },

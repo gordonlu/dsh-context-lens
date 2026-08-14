@@ -106,7 +106,11 @@ export interface RequestDiff {
     };
     likelyCauses?: LikelyCause[];
 }
-/** Running session counters over the retained window. */
+/**
+ * Cumulative session counters. They keep counting past the retained-window
+ * trim (the newest 100 records), so `totalRequests` can exceed the window
+ * length — the counts are session-level, the records window-level.
+ */
 export interface ContextLensSummary {
     totalRequests: number;
     cacheDrops: number;

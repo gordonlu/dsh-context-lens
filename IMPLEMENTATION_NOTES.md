@@ -1,6 +1,6 @@
 # Implementation Notes
 
-Engineering notes for dsh-context-lens v0.1. The READMEs carry the product story; this file carries the decisions, invariants, and the npm-ecosystem workaround.
+Engineering notes for dsh-context-lens v0.2. The READMEs carry the product story; this file carries the decisions, invariants, and the npm-ecosystem workaround.
 
 ## Design principles (in force)
 
@@ -16,7 +16,7 @@ Engineering notes for dsh-context-lens v0.1. The READMEs carry the product story
 
 - The real agent loop emits `step/start` … `step/end` (always — even on error/abort, `step/end` lands in a `finally`) … `turn/end` once per turn. The fold mirrors that shape: `step/start` opens a pending record; `step/end` marks the span closed (`stepEnded`); `turn/end` finalizes the last pending with the turn's end reason; intermediate steps finalize at the next `step/start` carrying the `step/end` marker. A crash-orphaned pending (no `step/end`, no `turn/end`) closes as **failed** at the next `step/start`.
 - Status matrix: message present **and** (turn ended **or** `step/end` closed the step) → `completed`; no message and `aborted` → `aborted`; no message and `error` → `failed`; message but neither marker (crash orphan) → `failed`.
-- Retries re-emit `request/header` inside the step; the pending record is updated, never duplicated. The final `assistant/message` usage replaces any earlier `assistant/chunk` usage sample.
+- Retries stay inside the same step and never mint a new record. Verified against current mainline: the agent loop re-dispatches on `agent/request-error` inside a `while (true)` with the SAME turn/step, so retry chunks and the final message carry identical `{turn, step}`. The llm-retry README describes a fresh-turn shape; the fold supports both — a fresh-turn retry splits records naturally at the new `step/start` (defensive test `splits records when a retry opens a fresh turn`). The final `assistant/message` usage replaces any earlier `assistant/chunk` usage sample.
 - Usage arrives only via `assistant/message` (explicit `usage` field) or an `assistant/chunk` of type `usage`. Anything else stays absent — `unavailable`, never `0`.
 - The retained window keeps the newest 100 records (`MAX_RETAINED_REQUESTS`); counters (`totalRequests`, `cacheDrops`, `structuralChanges`) are cumulative and survive trimming.
 
@@ -40,7 +40,7 @@ The published `@deepseek-ai/*` registry snapshot is inconsistent:
 - `@deepseek-ai/dsh-compact` (a dependency of `@deepseek-ai/dsh-client-runtime`, a peer of `dsh-client-ui-conversation`) and `@deepseek-ai/dsh-type-meta` (a peer of `dsh-client-runtime` and `dsh-session`) **do not exist on any registry** (npmjs and npmmirror both 404).
 - pnpm ≥ 10/11 auto-installs peer dependencies regardless of `auto-install-peers=false` (verified in a scratch project), and `pnpm.overrides` with `file:`/`link:` targets is ineffective when the target package cannot be resolved from the registry at all (verified in a second scratch project).
 
-The workaround: **type-only vendored snapshots**. Each of the eight dev-time packages (`dsh-session`, `dsh-llm`, `dsh-session-projection`, `dsh-invariants`, `dsh-brand`, `dsh-client-locale`, `dsh-client-ui-slots`, `dsh-client-ui-conversation`, `dsh-client-runtime`) is vendored under `vendor-stubs/<name>/`:
+The workaround: **type-only vendored snapshots**. Each of the nine dev-time packages (`dsh-session`, `dsh-llm`, `dsh-session-projection`, `dsh-invariants`, `dsh-brand`, `dsh-client-locale`, `dsh-client-ui-slots`, `dsh-client-ui-conversation`, `dsh-client-runtime`) is vendored under `vendor-stubs/<name>/`:
 
 - `lib/types/` copied verbatim from the published tarball (source of type truth, pinning `0.0.1-rc.1`; `dsh-invariants` pins `0.1.0-rc.6`).
 - `package.json` sanitized: **no** `dependencies`/`peerDependencies` (so pnpm never auto-installs the missing packages), exports map reduced to `types` conditions.
@@ -58,7 +58,7 @@ Note: registry `dsh-session-projection` declares `zod@^4.4.3` while this project
 - Externals = the loader's module-table entries. The keys MUST be the shell's frozen `PLATFORM_MODULES` (`@deepseek-ai/dsh-client-web/src/platform.ts`) plus the runtime registration — every dsh-* key is `@deepseek-ai`-scoped there; the `CLIENT_EXTERNALS` list is asserted against the shell source by `smoke/client-smoke.mts`. Everything else inlines (`deps.neverBundle` / `deps.alwaysBundle`).
 - CSS Modules go through a virtual-id plugin (`\0dsh-css:` + `.mjs`, so tsdown's `.css` guard never sees them), compiled by lightningcss (`[hash]_[local]`, minified), and emitted as one idempotent `<style data-plugin="dsh-context-lens" data-plugin-css="…">` tag per module file. `addWatchFile` keeps the physical stylesheet in the watch graph.
 
-## Test suite (53 tests)
+## Test suite (64 tests)
 
 - `fingerprint.spec.ts` — canonicalization (key order, array order, verbatim primitives), hash stability, schema estimation.
 - `cache.spec.ts` — billed/reuse math, absent-fields-are-absent, drop thresholds, surface alarms, exported constants.

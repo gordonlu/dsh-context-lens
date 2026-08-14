@@ -10,3 +10,4 @@ smoke/out/
 .e2e-home/
 smoke/.e2e.log
 smoke/.probe.log
+.pub-home/

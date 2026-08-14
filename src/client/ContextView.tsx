@@ -24,10 +24,18 @@ function latestRequestId(requests: readonly { id: string }[]): string | null {
 }
 
 export function ContextView(props: ContextLensViewProps) {
-  const { useProjection, t } = props
+  const { useProjection, useSession, t } = props
   const projection = useProjection('contextLens')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const rootRef = useRef<HTMLElement | null>(null)
+
+  // Track conversation growth while the lens panel is open: switching back to
+  // Chat scrolls to the latest message only when new nodes appeared.
+  const nodeCount = useSession(snapshot => snapshot.nodes.length)
+  const nodeCountRef = useRef(0)
+  useEffect(() => {
+    nodeCountRef.current = nodeCount
+  }, [nodeCount])
 
   // The conversation session's scrollport is SHARED across the view tabs
   // (Chat / Trajectory / Context Lens). Switching tabs swaps the content but
@@ -39,19 +47,34 @@ export function ContextView(props: ContextLensViewProps) {
     let node: HTMLElement | null = rootRef.current
     let scroller: HTMLElement | null = null
     while (node !== null) {
-      if (node.scrollHeight > node.clientHeight + 4) {
+      // A real scrollport: `overflow-y` actually scrolls AND content
+      // overflows. `scrollHeight > clientHeight` alone also matches boxes
+      // whose content overflows without scrolling (the lens panel's own
+      // root), and `scrollTop` writes on those are silent no-ops — which
+      // left the shared scrollport unreset on entry and unrestored on exit.
+      const overflowY = getComputedStyle(node).overflowY
+      if (
+        (overflowY === 'auto' || overflowY === 'scroll') &&
+        node.scrollHeight > node.clientHeight + 4
+      ) {
         scroller = node
         break
       }
       node = node.parentElement
     }
     if (scroller === null) return
-    // Enter at the top of the panel; restore the user's prior stream
-    // position when they switch back to Chat.
-    const enterTop = scroller.scrollTop
+    // Enter at the top of the panel. On exit, do NOT restore a scroll value
+    // ourselves: the official Chat view owns per-session scroll memory
+    // (`chatScroll`, semantic anchorKey/anchorTop) and restores the reader's
+    // position on remount — our numeric write would run after it and clobber
+    // the exact position. We only intervene when the conversation grew while
+    // the lens was open: jump to the latest message.
+    const enterNodes = nodeCountRef.current
     scroller.scrollTop = 0
     return () => {
-      scroller.scrollTop = enterTop
+      if (nodeCountRef.current > enterNodes) {
+        scroller.scrollTop = scroller.scrollHeight
+      }
     }
   }, [])
 

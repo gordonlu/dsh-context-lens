@@ -26,10 +26,12 @@ export declare const zh: {
     readonly 'overview.dropCount': "缓存回落";
     readonly 'overview.none': "未发生";
     readonly 'overview.needsAttention': "需要关注";
+    readonly 'overview.recovered': "近 {count} 个请求无回落";
     readonly 'list.title': "最近请求";
     readonly 'list.empty': "还没有 LLM 请求。发送一条消息后这里会出现每次请求的变化与缓存复用情况。";
-    readonly 'list.filtered.empty': "最近请求均无变化。取消“隐藏无变化请求”可查看全部。";
+    readonly 'list.filtered.empty': "最近请求均无值得关注的变化。取消勾选过滤可查看全部。";
     readonly 'list.hideUnchanged': "隐藏无变化请求";
+    readonly 'list.hideSurface': "隐藏仅上下文增长";
     readonly 'list.cache': "缓存 {percent}%";
     readonly 'list.cache.drop': "缓存回落";
     readonly 'list.cache.unavailable': "用量 n/a";

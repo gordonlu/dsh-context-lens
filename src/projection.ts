@@ -72,6 +72,8 @@ export interface ContextLensState {
   totalRequests: number
   cacheDrops: number
   structuralChanges: number
+  /** Session-global ordinal of the most recent cache drop (0 = none yet). */
+  lastDropOrdinal: number
   /** Header fingerprint in force between requests (epoch semantics). */
   epoch: HeaderFingerprint | null
   epochContext?: { provider: string; model: string; contextWindow?: number }
@@ -83,6 +85,8 @@ const summarySchema = z.object({
   totalRequests: z.number().int().nonnegative(),
   cacheDrops: z.number().int().nonnegative(),
   structuralChanges: z.number().int().nonnegative(),
+  // `.default` keeps persisted pre-window snapshots parseable.
+  lastDropOrdinal: z.number().int().nonnegative().default(0),
 }).strict()
 
 const toolFingerprintSchema = z.object({
@@ -181,7 +185,7 @@ const projectionSchema = z.object({
   summary: summarySchema,
 }).strict() as unknown as z.ZodType<ContextLensProjection>
 
-const emptySummary = (): ContextLensSummary => ({ totalRequests: 0, cacheDrops: 0, structuralChanges: 0 })
+const emptySummary = (): ContextLensSummary => ({ totalRequests: 0, cacheDrops: 0, structuralChanges: 0, lastDropOrdinal: 0 })
 
 const usageFrom = (usage: TokenUsage): RequestUsage => ({
   inputTokens: usage.inputTokens,
@@ -243,6 +247,7 @@ function finalize(state: ContextLensState, pending: PendingRequest): ContextLens
     totalRequests: state.totalRequests + 1,
     cacheDrops: state.cacheDrops + (record.cache?.drop === true ? 1 : 0),
     structuralChanges: state.structuralChanges + (structural ? 1 : 0),
+    lastDropOrdinal: record.cache?.drop === true ? state.totalRequests + 1 : state.lastDropOrdinal,
   }
 }
 
@@ -272,6 +277,7 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
     totalRequests: 0,
     cacheDrops: 0,
     structuralChanges: 0,
+    lastDropOrdinal: 0,
     epoch: null,
     surfaceCarry: 0,
   }),
@@ -382,6 +388,7 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
       totalRequests: state.totalRequests,
       cacheDrops: state.cacheDrops,
       structuralChanges: state.structuralChanges,
+      lastDropOrdinal: state.lastDropOrdinal,
     },
   }),
   // 2: schemaBytes is UTF-8 byte length (was JS string length).

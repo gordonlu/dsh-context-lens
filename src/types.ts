@@ -131,6 +131,12 @@ export interface ContextLensSummary {
   totalRequests: number
   cacheDrops: number
   structuralChanges: number
+  /**
+   * Session-global ordinal of the most recent cache drop (1-based; 0 when
+   * none happened yet). Health is windowed: the session is unstable only
+   * while this lies within the recent window.
+   */
+  lastDropOrdinal: number
 }
 
 /**

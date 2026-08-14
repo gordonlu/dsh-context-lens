@@ -120,3 +120,15 @@ export function isUnchanged(request: RequestRecord): boolean {
   const delta = request.diffFromPrevious?.surface.estimatedDeltaTokens
   return delta === undefined || delta < SURFACE_TAG_MIN_DELTA
 }
+
+/**
+ * Whether a request is interesting ONLY because of significant surface
+ * growth — no structural change, no cache drop, no failure. The second-layer
+ * list filter hides these by default, leaving true events (drops, structural
+ * changes, failures); unchecking the filter reveals them again.
+ * @param request - the request record.
+ * @returns true when the request survives the unchanged filter solely via surface growth.
+ */
+export function surfaceOnly(request: RequestRecord): boolean {
+  return !structurallyChanged(request) && !isUnchanged(request)
+}

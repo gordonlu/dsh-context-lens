@@ -11,4 +11,6 @@ export interface OverviewProps {
     requests: readonly RequestRecord[];
     t: PropsLocale<typeof NS>['t'];
 }
+/** A session is unhealthy only while the latest cache drop sits inside this window. */
+export declare const HEALTH_WINDOW = 20;
 export declare function Overview(props: OverviewProps): import("react").JSX.Element;

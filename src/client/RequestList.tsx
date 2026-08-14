@@ -12,7 +12,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RequestRecord } from '../types.ts'
 import type { ContextLensKey } from './locales.ts'
 import { formatPercent, formatTokens } from './format.ts'
-import { globalOrdinal, isUnchanged, requestTag } from './request-summary.ts'
+import { globalOrdinal, isUnchanged, requestTag, surfaceOnly } from './request-summary.ts'
 import { NS } from './locales.ts'
 import css from './context-lens.module.css'
 
@@ -45,12 +45,18 @@ export function RequestList(props: RequestListProps) {
   const { requests, totalRequests, selectedId, onSelect, t } = props
   const selectedRef = useRef<HTMLButtonElement | null>(null)
   const [hideUnchanged, setHideUnchanged] = useState(true)
+  // Second layer: hide surface-only growth too, leaving true events
+  // (drops, structural changes, failures) in the default view.
+  const [hideSurface, setHideSurface] = useState(true)
   // The projection appends newest last; the list renders newest FIRST so the
   // live request sits at the top and the inspector stays in view.
   const ordered = useMemo(() => [...requests].reverse(), [requests])
   const visible = useMemo(
-    () => ordered.filter(request => !hideUnchanged || !isUnchanged(request)),
-    [ordered, hideUnchanged],
+    () => ordered.filter(request =>
+      (!hideUnchanged || !isUnchanged(request)) &&
+      (!hideSurface || !surfaceOnly(request)),
+    ),
+    [ordered, hideUnchanged, hideSurface],
   )
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'nearest' })
@@ -77,6 +83,14 @@ export function RequestList(props: RequestListProps) {
           onChange={event => setHideUnchanged(event.target.checked)}
         />
         <span>{t('list.hideUnchanged')}</span>
+      </label>
+      <label className={css.listToolbar}>
+        <input
+          type="checkbox"
+          checked={hideSurface}
+          onChange={event => setHideSurface(event.target.checked)}
+        />
+        <span>{t('list.hideSurface')}</span>
       </label>
       {visible.length === 0
         ? <div className={css.listEmpty}>{t('list.filtered.empty')}</div>

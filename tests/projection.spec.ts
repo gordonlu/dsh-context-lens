@@ -296,8 +296,23 @@ describe('contextLens projection: retention and counters', () => {
     ])
     expect(view.summary.cacheDrops).toBe(1)
     expect(view.summary.structuralChanges).toBe(1)
+    expect(view.summary.lastDropOrdinal).toBe(2)
     expect(view.latest!.cache?.drop).toBe(true)
     expect(view.latest!.diffFromPrevious!.likelyCauses).toContain('tools-changed')
+  })
+
+  it('keeps lastDropOrdinal at 0 when no drop ever happened', () => {
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      message(3, 1, 1, usage(200, 100)),
+      endTurn(4, 1),
+      startStep(2, 1, 5),
+      message(6, 2, 1, usage(300, 100)),
+      endTurn(7, 2),
+    ])
+    expect(view.summary.cacheDrops).toBe(0)
+    expect(view.summary.lastDropOrdinal).toBe(0)
   })
 
   it('returns the same state reference for uninteresting events', () => {

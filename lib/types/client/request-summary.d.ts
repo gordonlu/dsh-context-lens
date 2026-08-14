@@ -56,3 +56,12 @@ export declare function structurallyChanged(request: RequestRecord): boolean;
  * default filter; the whole point of the lens is surfacing it.
  */
 export declare function isUnchanged(request: RequestRecord): boolean;
+/**
+ * Whether a request is interesting ONLY because of significant surface
+ * growth — no structural change, no cache drop, no failure. The second-layer
+ * list filter hides these by default, leaving true events (drops, structural
+ * changes, failures); unchecking the filter reveals them again.
+ * @param request - the request record.
+ * @returns true when the request survives the unchanged filter solely via surface growth.
+ */
+export declare function surfaceOnly(request: RequestRecord): boolean;

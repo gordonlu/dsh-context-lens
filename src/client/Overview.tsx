@@ -16,6 +16,9 @@ export interface OverviewProps {
   t: PropsLocale<typeof NS>['t']
 }
 
+/** A session is unhealthy only while the latest cache drop sits inside this window. */
+export const HEALTH_WINDOW = 20
+
 type OverviewIconKind = 'health' | 'requests' | 'cache' | 'structure' | 'drop'
 
 function OverviewIcon(props: { kind: OverviewIconKind }) {
@@ -58,10 +61,21 @@ export function Overview(props: OverviewProps) {
   const drops = summary.cacheDrops
   const structural = summary.structuralChanges
   const latestReuse = requests[requests.length - 1]?.cache?.reuse
+  // Health is WINDOWED, not cumulative: a session with an old drop recovers
+  // once the drop leaves the recent window. The cumulative count still lives
+  // on the drop card below.
+  const lastDropOrdinal = summary.lastDropOrdinal
+  const unstable = lastDropOrdinal > 0 && summary.totalRequests - lastDropOrdinal <= HEALTH_WINDOW
   return (
     <div className={css.overview}>
       <div className={css.statusChips}>
-        <OverviewCard icon="health" label={t('overview.health')} value={drops === 0 ? `✓ ${t('overview.cacheStable')}` : t('overview.cacheDrops', { count: String(drops) })} tone={drops === 0 ? 'ok' : 'bad'} />
+        <OverviewCard
+          icon="health"
+          label={t('overview.health')}
+          value={!unstable ? `✓ ${t('overview.cacheStable')}` : t('overview.cacheDrops', { count: String(drops) })}
+          {...!unstable && lastDropOrdinal > 0 ? { meta: t('overview.recovered', { count: String(HEALTH_WINDOW) }) } : {}}
+          tone={!unstable ? 'ok' : 'bad'}
+        />
         <OverviewCard icon="requests" label={t('overview.requestCount')} value={String(summary.totalRequests)} meta={t('overview.requests', { count: String(summary.totalRequests) })} />
         <OverviewCard icon="cache" label={t('overview.hitRate')} value={latestReuse === undefined ? '—' : `${formatPercent(latestReuse)}%`} meta={t('inspector.cacheReuse')} />
         <OverviewCard icon="structure" label={t('overview.structure')} value={String(structural)} meta={structural === 0 ? `✓ ${t('overview.structureStable')}` : t('overview.structureChanges', { count: String(structural) })} {...structural > 0 ? { tone: 'bad' as const } : {}} />

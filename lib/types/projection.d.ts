@@ -52,6 +52,8 @@ export interface ContextLensState {
     totalRequests: number;
     cacheDrops: number;
     structuralChanges: number;
+    /** Session-global ordinal of the most recent cache drop (0 = none yet). */
+    lastDropOrdinal: number;
     /** Header fingerprint in force between requests (epoch semantics). */
     epoch: HeaderFingerprint | null;
     epochContext?: {

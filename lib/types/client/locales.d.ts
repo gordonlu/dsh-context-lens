@@ -19,6 +19,13 @@ export declare const zh: {
     readonly 'overview.cacheDrops': "{count} 次缓存回落";
     readonly 'overview.structureStable': "结构稳定";
     readonly 'overview.structureChanges': "{count} 次结构变化";
+    readonly 'overview.health': "会话健康度";
+    readonly 'overview.requestCount': "请求数";
+    readonly 'overview.hitRate': "缓存命中率";
+    readonly 'overview.structure': "结构变化";
+    readonly 'overview.dropCount': "缓存回落";
+    readonly 'overview.none': "未发生";
+    readonly 'overview.needsAttention': "需要关注";
     readonly 'list.title': "最近请求";
     readonly 'list.empty': "还没有 LLM 请求。发送一条消息后这里会出现每次请求的变化与缓存复用情况。";
     readonly 'list.filtered.empty': "最近请求均无变化。取消“隐藏无变化请求”可查看全部。";
@@ -40,6 +47,8 @@ export declare const zh: {
     readonly 'inspector.cacheReuse': "缓存复用";
     readonly 'inspector.newInput': "新增输入";
     readonly 'inspector.contextSurface': "估算请求上下文";
+    readonly 'inspector.cacheImpact': "缓存影响";
+    readonly 'inspector.request': "请求 #{ordinal}";
     readonly 'inspector.deltaUp': "↑{delta} 个百分点";
     readonly 'inspector.deltaDown': "↓{delta} 个百分点";
     readonly 'inspector.unavailable': "-";
@@ -61,6 +70,7 @@ export declare const zh: {
     readonly 'inspector.likely.title': "同时发生的变化";
     readonly 'inspector.likely.hint': "仅相关，不构成因果。";
     readonly 'inspector.conclusion.ok': "未检测到影响缓存的请求变化。";
+    readonly 'inspector.conclusion.detail': "当前请求结构保持稳定，缓存性能未见结构性风险。";
     readonly 'inspector.drop.banner': "缓存复用较上次请求回落 {delta} 个百分点";
     readonly 'cause.model-or-provider-changed': "模型或服务商变化";
     readonly 'cause.system-changed': "系统提示变化";

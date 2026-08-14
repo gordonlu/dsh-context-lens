@@ -55,6 +55,7 @@ export function ContextView(props: ContextLensViewProps) {
     <section className={css.root}>
       <Overview
         summary={projection.summary}
+        requests={requests}
         t={t}
       />
       <div className={css.layout}>

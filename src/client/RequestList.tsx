@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RequestRecord } from '../types.ts'
 import type { ContextLensKey } from './locales.ts'
-import { formatPercent } from './format.ts'
+import { formatPercent, formatTokens } from './format.ts'
 import { globalOrdinal, isUnchanged, requestTag } from './request-summary.ts'
 import { NS } from './locales.ts'
 import css from './context-lens.module.css'
@@ -30,6 +30,15 @@ function cacheReadout(request: RequestRecord, t: PropsLocale<typeof NS>['t']): {
     text: t('list.cache', { percent: formatPercent(request.cache.reuse) }),
     drop: request.cache.drop === true,
   }
+}
+
+function requestTime(time: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(time)
 }
 
 export function RequestList(props: RequestListProps) {
@@ -52,6 +61,15 @@ export function RequestList(props: RequestListProps) {
   }
   return (
     <div className={css.list}>
+      <div className={css.listHeader}>
+        <span className={css.listTitle}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5l3.2 1.8" />
+          </svg>
+          {t('list.title')}
+        </span>
+        <span className={css.listCount}>{totalRequests}</span>
+      </div>
       <label className={css.listToolbar}>
         <input
           type="checkbox"
@@ -78,9 +96,23 @@ export function RequestList(props: RequestListProps) {
               className={`${css.listItem} ${request.id === selectedId ? css.listItemSelected : ''}`}
               onClick={() => onSelect(request.id)}
             >
-              <span className={css.seq}>#{ordinal}</span>
-              <span className={`${css.itemTag} ${tag.alarming ? css.itemTagAlarm : ''}`}>{tag.text}</span>
-              <span className={`${css.cacheCell} ${cache.drop ? css.cacheCellDrop : ''}`}>{cache.text}</span>
+              <span className={css.listItemHead}>
+                <span className={`${css.timelineIcon} ${tag.alarming ? css.timelineIconAlarm : ''}`}>
+                  <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {tag.alarming
+                      ? <><path d="M10 3 17 16H3L10 3Z" /><path d="M10 7.2v4.2M10 14h.01" /></>
+                      : <><circle cx="10" cy="10" r="7" /><path d="m6.8 10.2 2 2 4.5-4.6" /></>}
+                  </svg>
+                </span>
+                <span className={css.seq}>#{ordinal}</span>
+                <span className={`${css.itemTag} ${tag.alarming ? css.itemTagAlarm : ''}`}>{tag.text}</span>
+                <span className={css.itemTime}>{requestTime(request.time)}</span>
+              </span>
+              <span className={css.itemMetrics}>
+                <span>+{request.usage?.inputTokens === undefined ? '—' : formatTokens(request.usage.inputTokens)} tok</span>
+                <span>{formatTokens(request.estimatedSurfaceTokens)} ctx</span>
+                <span className={`${css.cacheCell} ${cache.drop ? css.cacheCellDrop : ''}`}>{cache.text}</span>
+              </span>
             </button>
           )
         })}

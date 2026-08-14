@@ -4,10 +4,11 @@
  * structural change flips the marks to alarm-style counts.
  */
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
-import type { ContextLensSummary } from '../types.ts';
+import type { ContextLensSummary, RequestRecord } from '../types.ts';
 import { NS } from './locales.ts';
 export interface OverviewProps {
     summary: ContextLensSummary;
+    requests: readonly RequestRecord[];
     t: PropsLocale<typeof NS>['t'];
 }
 export declare function Overview(props: OverviewProps): import("react").JSX.Element;

@@ -35,6 +35,25 @@ const CAUSE_KEY: Readonly<Record<LikelyCause, ContextLensKey>> = {
   'no-obvious-change': 'cause.no-obvious-change',
 }
 
+type InspectorIconKind = 'request' | 'system' | 'tools' | 'order' | 'config' | 'model' | 'provider' | 'surface' | 'check'
+
+function InspectorIcon(props: { kind: InspectorIconKind }) {
+  const { kind } = props
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {kind === 'request' && <><path d="M5 4.5h14v11H9l-4 4v-15Z" /><path d="M8 8h8M8 12h5" /></>}
+      {kind === 'system' && <><path d="M5 4.5h14v12H8l-3 3v-15Z" /><path d="M9 9h6M9 12.5h4" /></>}
+      {kind === 'tools' && <><path d="m14.5 5 4.5 4.5-9.8 9.8-4.5-4.5L14.5 5Z" /><path d="m12.5 7 4.5 4.5M7 12.5l4.5 4.5" /></>}
+      {kind === 'order' && <><path d="M8 6h11M8 12h8M8 18h5" /><path d="m3.5 5 1 1 2-2M3.5 11l1 1 2-2M3.5 17l1 1 2-2" /></>}
+      {kind === 'config' && <><path d="M4 7h8M16 7h4M4 17h4M12 17h8" /><circle cx="14" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>}
+      {kind === 'model' && <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v8.5" /></>}
+      {kind === 'provider' && <><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5C9.7 18.1 8.5 15.3 8.5 12S9.7 5.9 12 3.5Z" /></>}
+      {kind === 'surface' && <><path d="M4 15.5c2.4-5 5.2-5 8-1s5.5 4 8-2" /><path d="M4 19.5c2.4-5 5.2-5 8-1s5.5 4 8-2" /><path d="M4 11.5c2.4-5 5.2-5 8-1s5.5 4 8-2" /></>}
+      {kind === 'check' && <><circle cx="12" cy="12" r="9" /><path d="m7.8 12.2 2.7 2.7 5.8-6" /></>}
+    </svg>
+  )
+}
+
 /** First `limit` items of a name list, ellipsized. */
 function cappedList(names: readonly string[], limit: number): string {
   const shown = names.slice(0, limit)
@@ -43,10 +62,10 @@ function cappedList(names: readonly string[], limit: number): string {
 }
 
 /** One stat row of the primary readout. */
-function MainStat(props: { label: string; value: string; detail?: string; alarm?: boolean }) {
-  const { label, value, detail, alarm } = props
+function MainStat(props: { label: string; value: string; detail?: string; alarm?: boolean; accent?: boolean }) {
+  const { label, value, detail, alarm, accent } = props
   return (
-    <div className={css.stat}>
+    <div className={`${css.stat} ${accent === true ? css.statAccent : ''}`}>
       <span className={css.statLabel}>{label}</span>
       <span className={`${css.statValue} ${alarm === true ? css.statValueAlarm : ''}`}>
         {value}
@@ -57,11 +76,11 @@ function MainStat(props: { label: string; value: string; detail?: string; alarm?
 }
 
 /** One row of the comparison panel: label + verdict. */
-function CompareRow(props: { label: string; verdict: string; changed?: boolean }) {
-  const { label, verdict, changed } = props
+function CompareRow(props: { label: string; verdict: string; changed?: boolean; kind: Exclude<InspectorIconKind, 'request' | 'check'> }) {
+  const { label, verdict, changed, kind } = props
   return (
-    <div className={css.compareRow}>
-      <span className={css.compareLabel}>{label}</span>
+    <div className={css.compareRow} data-kind={kind}>
+      <span className={css.compareLabel}><span className={css.compareMark}><InspectorIcon kind={kind} /></span>{label}</span>
       <span className={`${css.compareVerdict} ${changed === true ? css.compareVerdictChanged : ''}`}>{verdict}</span>
     </div>
   )
@@ -106,8 +125,16 @@ export function RequestInspector(props: RequestInspectorProps) {
       )}
 
       <div className={css.inspectorHead}>
-        <span className={css.seq}>#{ordinal}</span>
-        <span className={`${css.statusPill} ${tag.alarming ? css.statusPillAlarm : css.statusPillOk}`}>{tag.text}</span>
+        <div className={css.requestTitleGroup}>
+          <span className={css.requestIcon}><InspectorIcon kind="request" /></span>
+          <span className={css.requestTitle}>{t('inspector.request', { ordinal: String(ordinal) })}</span>
+          <span className={`${css.statusPill} ${tag.alarming ? css.statusPillAlarm : css.statusPillOk}`}>{tag.text}</span>
+          <span className={css.requestTime}>{new Date(request.time).toLocaleTimeString()}</span>
+        </div>
+        <div className={css.requestIdentity}>
+          <span className={css.modelBadge}>{request.model ?? t('inspector.unavailable')}</span>
+          {request.provider !== undefined && <span className={css.providerBadge}>{request.provider}</span>}
+        </div>
       </div>
 
       <div className={css.panel}>
@@ -123,6 +150,7 @@ export function RequestInspector(props: RequestInspectorProps) {
                 : t('inspector.deltaUp', { delta: String(Math.round(cache.deltaPoints)) }),
             }}
             alarm={cache?.drop === true}
+            accent
           />
           <MainStat
             label={t('inspector.newInput')}
@@ -133,6 +161,14 @@ export function RequestInspector(props: RequestInspectorProps) {
           <MainStat
             label={t('inspector.contextSurface')}
             value={`${formatTokens(request.estimatedSurfaceTokens)} tok`}
+          />
+          <MainStat
+            label={t('inspector.cacheImpact')}
+            value={cache?.deltaPoints === undefined ? '—' : `${Math.round(cache.deltaPoints)} pt`}
+            {...cache?.deltaPoints === undefined || cache.deltaPoints === 0
+              ? { detail: t('inspector.noChange') }
+              : {}}
+            alarm={cache?.drop === true}
           />
         </div>
       </div>
@@ -145,11 +181,13 @@ export function RequestInspector(props: RequestInspectorProps) {
               : t('inspector.compare', { prev: `#${String(previousOrdinal)}` })}
           </div>
           <CompareRow
+            kind="system"
             label={t('inspector.compare.system')}
             verdict={diff.system.changed ? t('inspector.changed') : t('inspector.noChange')}
             changed={diff.system.changed}
           />
           <CompareRow
+            kind="tools"
             label={t('inspector.compare.tools')}
             verdict={diff.tools.changed
               ? (() => {
@@ -162,6 +200,7 @@ export function RequestInspector(props: RequestInspectorProps) {
           />
           {diff.tools.changed && <ToolsDiff added={diff.tools.added} removed={diff.tools.removed} modified={diff.tools.modified} t={t} />}
           <CompareRow
+            kind="order"
             label={t('inspector.compare.order')}
             verdict={diff.tools.orderChanged ? t('inspector.changed') : t('inspector.noChange')}
             changed={diff.tools.orderChanged}
@@ -172,11 +211,13 @@ export function RequestInspector(props: RequestInspectorProps) {
             </div>
           )}
           <CompareRow
+            kind="config"
             label={t('inspector.compare.config')}
             verdict={diff.configChanged ? t('inspector.changed') : t('inspector.noChange')}
             changed={diff.configChanged}
           />
           <CompareRow
+            kind="model"
             label={t('inspector.compare.model')}
             verdict={diff.modelChanged
               ? `→ ${request.model ?? '?'}`
@@ -184,6 +225,7 @@ export function RequestInspector(props: RequestInspectorProps) {
             changed={diff.modelChanged}
           />
           <CompareRow
+            kind="provider"
             label={t('inspector.compare.provider')}
             verdict={diff.providerChanged
               ? `→ ${request.provider ?? '?'}`
@@ -192,6 +234,7 @@ export function RequestInspector(props: RequestInspectorProps) {
           />
           {surfaceDelta !== undefined && surfaceDelta > 0 && (
             <CompareRow
+              kind="surface"
               label={t('inspector.compare.surface')}
               verdict={t('inspector.compare.surfaceDelta', { delta: formatTokens(surfaceDelta) })}
               changed={surfaceDelta >= 1024}
@@ -210,7 +253,18 @@ export function RequestInspector(props: RequestInspectorProps) {
       )}
 
       {drop === false && !hasStructuralChange && (
-        <div className={css.conclusion}>{t('inspector.conclusion.ok')}</div>
+        <div className={css.conclusion}>
+          <span className={css.conclusionMark}><InspectorIcon kind="check" /></span>
+          <span>
+            <strong>{t('inspector.conclusion.ok')}</strong>
+            <small>{t('inspector.conclusion.detail')}</small>
+          </span>
+          <svg className={css.conclusionWave} viewBox="0 0 320 80" aria-hidden="true" fill="none">
+            <path d="M0 50C54 10 104 78 164 40s98-18 156 10" />
+            <path d="M0 60C62 20 112 86 172 48s96-16 148 6" />
+            <path d="M14 38c48-30 94 22 144-2s94-28 148 4" />
+          </svg>
+        </div>
       )}
 
       <div className={css.techFold}>

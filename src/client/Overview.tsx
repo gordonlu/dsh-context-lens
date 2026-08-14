@@ -5,31 +5,67 @@
  */
 
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ContextLensSummary } from '../types.ts'
+import type { ContextLensSummary, RequestRecord } from '../types.ts'
 import { NS } from './locales.ts'
+import { formatPercent } from './format.ts'
 import css from './context-lens.module.css'
 
 export interface OverviewProps {
   summary: ContextLensSummary
+  requests: readonly RequestRecord[]
   t: PropsLocale<typeof NS>['t']
 }
 
+type OverviewIconKind = 'health' | 'requests' | 'cache' | 'structure' | 'drop'
+
+function OverviewIcon(props: { kind: OverviewIconKind }) {
+  const { kind } = props
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {kind === 'health' && <><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" /><path d="m8.4 12.2 2.2 2.2 5-5.2" /></>}
+      {kind === 'requests' && <><path d="M7 7h10M7 12h10M7 17h6" /><path d="M4 5.5v13M20 5.5v13" /></>}
+      {kind === 'cache' && <><path d="M4.5 8.5A8 8 0 0 1 18.6 6" /><path d="m18.5 2 .1 4.1-4.1-.1" /><path d="M19.5 15.5A8 8 0 0 1 5.4 18" /><path d="m5.5 22-.1-4.1 4.1.1" /></>}
+      {kind === 'structure' && <><rect x="4" y="4" width="6" height="6" rx="1.5" /><rect x="14" y="4" width="6" height="6" rx="1.5" /><rect x="9" y="14" width="6" height="6" rx="1.5" /><path d="M7 10v2h10v-2M12 12v2" /></>}
+      {kind === 'drop' && <><path d="M5 5v14h14" /><path d="m7.5 9.5 4 4 3-3 4 5" /></>}
+    </svg>
+  )
+}
+
+function OverviewCard(props: {
+  icon: OverviewIconKind
+  label: string
+  value: string
+  meta?: string
+  tone?: 'ok' | 'bad'
+}) {
+  const { icon, label, value, meta, tone } = props
+  return (
+    <div className={`${css.overviewCard} ${tone === 'ok' ? css.overviewCardOk : ''} ${tone === 'bad' ? css.overviewCardBad : ''}`}>
+      <span className={css.overviewIcon}><OverviewIcon kind={icon} /></span>
+      <span className={css.overviewCardBody}>
+        <span className={css.overviewLabel}>{label}</span>
+        <span className={css.overviewReading}>
+          <strong>{value}</strong>
+          {meta !== undefined && <small>{meta}</small>}
+        </span>
+      </span>
+    </div>
+  )
+}
+
 export function Overview(props: OverviewProps) {
-  const { summary, t } = props
+  const { summary, requests, t } = props
   const drops = summary.cacheDrops
   const structural = summary.structuralChanges
+  const latestReuse = requests[requests.length - 1]?.cache?.reuse
   return (
     <div className={css.overview}>
       <div className={css.statusChips}>
-        {drops === 0
-          ? <span className={`${css.statusChip} ${css.statusChipOk}`}>✓ {t('overview.cacheStable')}</span>
-          : <span className={`${css.statusChip} ${css.statusChipBad}`}>⚠ {t('overview.cacheDrops', { count: String(drops) })}</span>}
-        {structural === 0
-          ? <span className={`${css.statusChip} ${css.statusChipOk}`}>✓ {t('overview.structureStable')}</span>
-          : <span className={`${css.statusChip} ${css.statusChipBad}`}>⚠ {t('overview.structureChanges', { count: String(structural) })}</span>}
-        <span className={css.overviewCount}>
-          {t('overview.requests', { count: String(summary.totalRequests) })}
-        </span>
+        <OverviewCard icon="health" label={t('overview.health')} value={drops === 0 ? `✓ ${t('overview.cacheStable')}` : t('overview.cacheDrops', { count: String(drops) })} tone={drops === 0 ? 'ok' : 'bad'} />
+        <OverviewCard icon="requests" label={t('overview.requestCount')} value={String(summary.totalRequests)} meta={t('overview.requests', { count: String(summary.totalRequests) })} />
+        <OverviewCard icon="cache" label={t('overview.hitRate')} value={latestReuse === undefined ? '—' : `${formatPercent(latestReuse)}%`} meta={t('inspector.cacheReuse')} />
+        <OverviewCard icon="structure" label={t('overview.structure')} value={String(structural)} meta={structural === 0 ? `✓ ${t('overview.structureStable')}` : t('overview.structureChanges', { count: String(structural) })} {...structural > 0 ? { tone: 'bad' as const } : {}} />
+        <OverviewCard icon="drop" label={t('overview.dropCount')} value={String(drops)} meta={drops === 0 ? t('overview.none') : t('overview.needsAttention')} {...drops > 0 ? { tone: 'bad' as const } : {}} />
       </div>
     </div>
   )

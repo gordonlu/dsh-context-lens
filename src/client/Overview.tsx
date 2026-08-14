@@ -1,47 +1,36 @@
 /**
- * The overview strip: session counters plus the latest request's cache-reuse
- * readout, with an alarm banner when the latest request's cache reuse
- * dropped.
+ * The session status strip: does this session need attention? Healthy shows
+ * two green marks plus the analyzed-request count; the first cache drop or
+ * structural change flips the marks to alarm-style counts.
  */
 
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ContextLensSummary, RequestRecord } from '../types.ts'
+import type { ContextLensSummary } from '../types.ts'
 import { NS } from './locales.ts'
-import { formatPercent } from './format.ts'
 import css from './context-lens.module.css'
 
 export interface OverviewProps {
   summary: ContextLensSummary
-  latest: RequestRecord | undefined
   t: PropsLocale<typeof NS>['t']
 }
 
 export function Overview(props: OverviewProps) {
-  const { summary, latest, t } = props
-  const drop = latest?.cache?.drop === true ? latest.cache : undefined
+  const { summary, t } = props
+  const drops = summary.cacheDrops
+  const structural = summary.structuralChanges
   return (
     <div className={css.overview}>
-      <div className={css.chips}>
-        <div className={css.chip}>
-          <span className={css.chipLabel}>{t('overview.requests')}</span>
-          <span className={css.chipValue}>{summary.totalRequests}</span>
-        </div>
-        <div className={css.chip}>
-          <span className={css.chipLabel}>{t('overview.cacheDrops')}</span>
-          <span className={`${css.chipValue} ${summary.cacheDrops > 0 ? css.chipDanger : ''}`}>
-            {summary.cacheDrops}
-          </span>
-        </div>
-        <div className={css.chip}>
-          <span className={css.chipLabel}>{t('overview.structuralChanges')}</span>
-          <span className={css.chipValue}>{summary.structuralChanges}</span>
-        </div>
+      <div className={css.statusChips}>
+        {drops === 0
+          ? <span className={`${css.statusChip} ${css.statusChipOk}`}>✓ {t('overview.cacheStable')}</span>
+          : <span className={`${css.statusChip} ${css.statusChipBad}`}>⚠ {t('overview.cacheDrops', { count: String(drops) })}</span>}
+        {structural === 0
+          ? <span className={`${css.statusChip} ${css.statusChipOk}`}>✓ {t('overview.structureStable')}</span>
+          : <span className={`${css.statusChip} ${css.statusChipBad}`}>⚠ {t('overview.structureChanges', { count: String(structural) })}</span>}
+        <span className={css.overviewCount}>
+          {t('overview.requests', { count: String(summary.totalRequests) })}
+        </span>
       </div>
-      {drop !== undefined && drop.deltaPoints !== undefined && (
-        <div className={css.banner}>
-          {t('inspector.drop.banner', { delta: String(Math.round(Math.abs(drop.deltaPoints))) })}
-        </div>
-      )}
     </div>
   )
 }

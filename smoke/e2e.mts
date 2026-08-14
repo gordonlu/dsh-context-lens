@@ -150,35 +150,56 @@ async function main(): Promise<number> {
   // 4. Lens tab + panel (Chinese baseline).
   let panel = await openLensPanel()
   check('lens tab label is 请求上下文 (zh)', (await tabs()).includes('请求上下文'), await tabs())
-  // The overview chips must interpolate their {count} templates — a raw
-  // placeholder would mean the translate call missed its parameters, and a
-  // duplicated number means the label AND the value both rendered it.
-  check('overview chip counts interpolated (no {count} literals)', !panel.includes('{count}') && !panel.includes('{percent}'), panel.includes('{count}'))
-  check('overview strip shows request count', /(请求|Requests)[\s\S]{0,30}\d+/.test(panel), panel.includes('{count}') ? 'placeholder present' : 'ok')
-  check('overview chip number rendered once, not twice', !/(请求|Requests)\s+(\d+)\s+\2/.test(panel), 'ok')
-  check('record 1:1 listed as completed', /1:1[\s\S]{0,40}(完成|Completed)/.test(panel), panel.slice(0, 400).replace(/\n+/g, ' '))
-  check('usage bucket shows uncached input 3 (mock prompt_tokens)', /(输入\(未缓存\)|Uncached input)[\s\S]{0,20}3/.test(panel))
-  check('cache read stays unavailable, never 0', /(缓存读取|Cache read)[\s\S]{0,20}unavailable/.test(panel))
+  // Session status strip: healthy marks + analyzed count, no raw placeholders.
+  check('no raw {count}/{percent} literals', !panel.includes('{count}') && !panel.includes('{percent}'))
+  check('status strip shows cache stable + structure stable', panel.includes('✓ 缓存稳定') && panel.includes('✓ 结构稳定'), panel.includes('✓ 缓存稳定'))
+  check('status strip shows the analyzed count', /(\d+) 次请求/.test(panel), panel.match(/(\d+) 次请求/)?.[0])
   check('no doubled percent sign (100%% regression)', !panel.includes('%%'), panel.includes('%%') ? '%% found' : 'ok')
 
-  // 5. Second real turn → second record, diff computed without structural change.
+  // The only request so far is stable → hidden by default; untick to see it.
+  check('unchanged requests hidden by default', panel.includes('均无变化'), panel.includes('均无变化') ? 'ok' : panel.slice(0, 300).replace(/\n+/g, ' '))
+  await page.locator('label', { hasText: /隐藏无变化请求/ }).first().click()
+  await page.waitForTimeout(1200)
+  panel = await page.evaluate(() => document.body?.innerText ?? '')
+  check('list shows #1 stable after unticking', panel.includes('#1') && panel.includes('稳定'), panel.includes('#1'))
+  check('cache readout is 用量 n/a for the mock', panel.includes('用量 n/a'))
+
+  // Inspector: primary readout without usage buckets.
+  check('inspector shows cache reuse as — (mock reports no cache)', /缓存复用[\s\S]{0,20}—/.test(panel))
+  check('inspector shows the new-input readout', panel.includes('新增输入'))
+  check('inspector shows the context surface readout', panel.includes('估算请求上下文'))
+  // The comparison panel compares against the previous request (#0 does not exist for the first record).
+  check('first record has no comparison panel', !panel.includes('对比'))
+
+  // Technical details fold: usage buckets and header hashes live behind it.
+  await page.locator('button', { hasText: /查看技术细节/ }).first().click()
+  await page.waitForTimeout(1200)
+  panel = await page.evaluate(() => document.body?.innerText ?? '')
+  check('primary readout shows new input 3 tok (mock prompt_tokens)', /新增输入[\s\S]{0,20}3 tok/.test(panel))
+  check('tech fold shows cache read as —, never 0', /缓存读取[\s\S]{0,20}—/.test(panel))
+  check('tech fold shows header hashes', panel.includes('系统提示') && /[0-9a-f]{8}/.test(panel))
+  check('tool list folded behind its own toggle', !panel.includes('ask_user_question'), panel.includes('ask_user_question'))
+
+  // 5. Second real turn → second record; the comparison panel appears.
   const input2 = page.locator('textarea:not([readonly]), [contenteditable="true"]').first()
   await input2.click()
   await input2.fill('E2E turn two')
   await input2.press('Enter')
   await page.waitForTimeout(12000)
   panel = await openLensPanel()
-  check('record 2:1 listed after the second turn', /2:1[\s\S]{0,40}(完成|Completed)/.test(panel), /2:1[\s\S]{0,40}(完成|Completed)/.test(panel) ? 'ok' : panel.slice(0, 600).replace(/\n+/g, ' '))
-  // The list renders newest first: 2:1's card must appear before 1:1's.
-  const first21 = panel.indexOf('2:1')
-  const first11 = panel.indexOf('1:1')
-  check('list renders newest request first', first21 !== -1 && first11 !== -1 && first21 < first11, { first21, first11 })
+  check('list shows #2 after the second turn', panel.includes('#2'), panel.includes('#2') ? 'ok' : panel.slice(0, 500).replace(/\n+/g, ' '))
+  // The list renders newest first: #2's card must appear before #1's.
+  const first2 = panel.indexOf('#2')
+  const first1 = panel.indexOf('#1')
+  check('list renders newest request first', first2 !== -1 && first1 !== -1 && first2 < first1, { first2, first1 })
+  check('comparison panel appears for the second record', panel.includes('对比 #1'), panel.includes('对比 #1') ? 'ok' : 'missing')
+  check('comparison shows no-change verdicts', /系统提示[\s\S]{0,20}无变化/.test(panel) && /工具[\s\S]{0,20}无变化/.test(panel))
 
-  // 5. Language switch zh → en and back.
+  // 6. Language switch zh → en and back.
   const enTabs = await switchLanguage('en')
   check('tab label follows locale to Request Context', enTabs.includes('Request Context'), enTabs)
   panel = await openLensPanel()
-  check('panel copy switches to English', panel.includes('Usage') || panel.includes('Completed'), panel.includes('Usage'))
+  check('panel copy switches to English', panel.includes('requests') || panel.includes('No change'), panel.includes('No change'))
   const zhTabs = await switchLanguage('zh')
   check('tab label returns to 请求上下文', zhTabs.includes('请求上下文'), zhTabs)
 

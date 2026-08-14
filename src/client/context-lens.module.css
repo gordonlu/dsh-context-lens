@@ -14,6 +14,8 @@
   color: var(--dsw-alias-label-primary, #1f2329);
 }
 
+/* ── session status strip ─────────────────────────────────────────────── */
+
 .overview {
   display: flex;
   flex-direction: column;
@@ -21,33 +23,37 @@
   flex: none;
 }
 
-.chips {
+.statusChips {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.chip {
+.statusChip {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
-}
-
-.chipLabel {
-  color: var(--dsw-alias-label-caption, #8a919f);
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 12px;
-}
-
-.chipValue {
-  font-variant-numeric: tabular-nums;
   font-weight: 600;
+  line-height: 1.4;
 }
 
-.chipDanger {
+.statusChipOk {
+  color: var(--dsw-static-green-700, #1b5e20);
+  background: var(--dsw-alias-interactive-bg-hover-success, rgba(27, 94, 32, 0.1));
+}
+
+.statusChipBad {
   color: var(--dsw-static-red-600, #c62828);
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+}
+
+.overviewCount {
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption, #8a919f);
 }
 
 .banner {
@@ -59,6 +65,8 @@
   font-size: 12px;
 }
 
+/* ── layout ────────────────────────────────────────────────────────────── */
+
 .layout {
   display: flex;
   gap: 12px;
@@ -66,22 +74,46 @@
   min-height: 0;
 }
 
+/* ── request list ──────────────────────────────────────────────────────── */
+
 .list {
   flex: none;
   width: 300px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   border-right: 1px solid var(--dsw-alias-button-ghost-active-border, rgba(128, 128, 128, 0.2));
   padding-right: 8px;
   color: var(--dsw-alias-label-caption, #8a919f);
 }
 
+.listToolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 2px 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.listToolbar input {
+  margin: 0;
+  accent-color: var(--dsw-static-blue-600, #3964fe);
+}
+
+.listEmpty {
+  padding: 12px 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+}
+
 .listItem {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 10px;
   padding: 7px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -101,52 +133,30 @@
   border-color: var(--dsw-alias-interactive-bg-active, rgba(38, 49, 72, 0.18));
 }
 
-.itemLine {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.statusPill {
-  flex: none;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 3px 7px;
-  border-radius: 999px;
-}
-
-.statusPill_completed {
-  color: var(--dsw-static-green-700, #1b5e20);
-  background: var(--dsw-alias-interactive-bg-hover-success, rgba(27, 94, 32, 0.1));
-}
-
-.statusPill_failed {
-  color: var(--dsw-static-red-600, #c62828);
-  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
-}
-
-.statusPill_aborted {
-  color: var(--dsw-static-orange-700, #e65100);
-  background: var(--dsw-alias-interactive-bg-hover-warning, rgba(230, 81, 0, 0.1));
-}
-
-.status {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-
 .seq {
   font-family: var(--ds-font-family-code, 'SF Mono', Consolas, monospace);
   font-size: 11px;
   color: var(--dsw-alias-label-caption, #8a919f);
+  min-width: 42px;
+  flex: none;
+}
+
+.itemTag {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.itemTagAlarm {
+  color: var(--dsw-static-red-600, #c62828);
+  font-weight: 600;
 }
 
 .cacheCell {
-  margin-left: auto;
   flex: none;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -158,37 +168,7 @@
   color: var(--dsw-static-red-600, #c62828);
 }
 
-.modelCell {
-  font-size: 11px;
-  color: var(--dsw-alias-label-caption, #8a919f);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  flex: 1;
-}
-
-.badges {
-  display: inline-flex;
-  gap: 4px;
-  flex: none;
-}
-
-.changedBadge {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
-  color: var(--dsw-alias-label-caption, #8a919f);
-}
-
-.dropBadge {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.05));
-  color: var(--dsw-static-red-600, #c62828);
-}
+/* ── inspector ─────────────────────────────────────────────────────────── */
 
 .inspector {
   flex: 1;
@@ -198,6 +178,30 @@
   flex-direction: column;
   gap: 10px;
   color: var(--dsw-alias-label-caption, #8a919f);
+}
+
+.inspectorHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusPill {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.statusPillOk {
+  color: var(--dsw-static-green-700, #1b5e20);
+  background: var(--dsw-alias-interactive-bg-hover-success, rgba(27, 94, 32, 0.1));
+}
+
+.statusPillAlarm {
+  color: var(--dsw-static-red-600, #c62828);
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
 }
 
 .panel {
@@ -220,8 +224,8 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 4px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
 }
 
 .stat {
@@ -241,14 +245,84 @@
   word-break: break-all;
 }
 
-.dim {
-  color: var(--dsw-alias-label-caption, #8a919f);
-  font-size: 11px;
+.statValueAlarm {
+  color: var(--dsw-static-red-600, #c62828);
+  font-weight: 600;
 }
 
-.mono {
-  font-family: var(--ds-font-family-code, 'SF Mono', Consolas, monospace);
-  font-size: 11px;
+.compareRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.compareLabel {
+  flex: none;
+  min-width: 76px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+}
+
+.compareVerdict {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.compareVerdictChanged {
+  color: var(--dsw-static-red-600, #c62828);
+  font-weight: 600;
+}
+
+.compareDetail {
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  padding-left: 86px;
+}
+
+.conclusion {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover-success, rgba(27, 94, 32, 0.08));
+  color: var(--dsw-static-green-700, #1b5e20);
+  font-size: 12px;
+}
+
+/* ── technical details fold ────────────────────────────────────────────── */
+
+.techFold {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.techToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.techToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.techToggleIcon {
+  font-size: 10px;
+  color: var(--dsw-alias-label-caption, #8a919f);
+}
+
+.techBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .toolsFold {
@@ -305,11 +379,6 @@
   white-space: nowrap;
 }
 
-.diffItem {
-  font-size: 12px;
-  color: var(--dsw-alias-label-primary, #1f2329);
-}
-
 .causeList {
   display: flex;
   flex-direction: column;
@@ -322,6 +391,16 @@
 .cause {
   font-size: 12px;
   color: var(--dsw-static-red-600, #c62828);
+}
+
+.dim {
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font-size: 11px;
+}
+
+.mono {
+  font-family: var(--ds-font-family-code, 'SF Mono', Consolas, monospace);
+  font-size: 11px;
 }
 
 .empty {
@@ -337,6 +416,7 @@
 .emptyTitle {
   font-size: 14px;
   font-weight: 600;
+  color: var(--dsw-alias-label-primary, #1f2329);
 }
 
 .emptyHint {

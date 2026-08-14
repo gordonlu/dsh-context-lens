@@ -1,6 +1,6 @@
 {
   "name": "dsh-context-lens",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Request Context Profiler for DeepSeek Harness — see what changed between model requests, and how cache reuse changed with it.",
   "license": "MIT",
   "type": "module",

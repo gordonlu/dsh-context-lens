@@ -42,7 +42,7 @@ export declare const zh: {
     readonly 'inspector.contextSurface': "估算请求上下文";
     readonly 'inspector.deltaUp': "↑{delta} 个百分点";
     readonly 'inspector.deltaDown': "↓{delta} 个百分点";
-    readonly 'inspector.unavailable': "—";
+    readonly 'inspector.unavailable': "-";
     readonly 'inspector.compare': "对比 {prev}";
     readonly 'inspector.noChange': "无变化";
     readonly 'inspector.changed': "有变化";

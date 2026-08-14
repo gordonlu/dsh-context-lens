@@ -50,7 +50,7 @@ export const zh = {
   'inspector.contextSurface': '估算请求上下文',
   'inspector.deltaUp': '↑{delta} 个百分点',
   'inspector.deltaDown': '↓{delta} 个百分点',
-  'inspector.unavailable': '—',
+  'inspector.unavailable': '-',
 
   // Inspector: comparison vs the previous request.
   'inspector.compare': '对比 {prev}',
@@ -135,7 +135,7 @@ export const en: Record<keyof typeof zh, string> = {
   'inspector.contextSurface': 'Context surface',
   'inspector.deltaUp': '↑{delta} pts',
   'inspector.deltaDown': '↓{delta} pts',
-  'inspector.unavailable': '—',
+  'inspector.unavailable': '-',
 
   'inspector.compare': 'vs {prev}',
   'inspector.noChange': 'No change',

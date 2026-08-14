@@ -165,7 +165,7 @@ async function main(): Promise<number> {
   check('cache readout is 用量 n/a for the mock', panel.includes('用量 n/a'))
 
   // Inspector: primary readout without usage buckets.
-  check('inspector shows cache reuse as — (mock reports no cache)', /缓存复用[\s\S]{0,20}—/.test(panel))
+  check('inspector shows cache reuse as - (mock reports no cache)', /缓存复用[\s\S]{0,20}-/.test(panel))
   check('inspector shows the new-input readout', panel.includes('新增输入'))
   check('inspector shows the context surface readout', panel.includes('估算请求上下文'))
   // The comparison panel compares against the previous request (#0 does not exist for the first record).
@@ -176,7 +176,7 @@ async function main(): Promise<number> {
   await page.waitForTimeout(1200)
   panel = await page.evaluate(() => document.body?.innerText ?? '')
   check('primary readout shows new input 3 tok (mock prompt_tokens)', /新增输入[\s\S]{0,20}3 tok/.test(panel))
-  check('tech fold shows cache read as —, never 0', /缓存读取[\s\S]{0,20}—/.test(panel))
+  check('tech fold shows cache read as -, never 0', /缓存读取[\s\S]{0,20}-/.test(panel))
   check('tech fold shows header hashes', panel.includes('系统提示') && /[0-9a-f]{8}/.test(panel))
   check('tool list folded behind its own toggle', !panel.includes('ask_user_question'), panel.includes('ask_user_question'))
 

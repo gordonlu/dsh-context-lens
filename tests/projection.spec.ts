@@ -108,6 +108,19 @@ describe('contextLens projection: request lifecycle', () => {
   })
 
   it('closes a crash-orphaned pending step as failed when the next step opens', () => {
+    // No step/end and no turn/end for the first step: the orphan path must
+    // still close it (as failed — a step that never ended) when step 2 opens.
+    const { view } = foldProjection([
+      startStep(1, 1, 1),
+      message(2, 1, 1, usage(100, 50)),
+      startStep(1, 2, 3),
+      message(4, 1, 2, usage(200, 60)),
+      endTurn(5, 1),
+    ])
+    expect(view.recentRequests.map(r => `${r.id}:${r.status}`)).toEqual(['1:1:failed', '1:2:completed'])
+  })
+
+  it('closes a crash-orphaned pending step across turns as failed', () => {
     const { view } = foldProjection([
       headerEvent(1),
       startStep(1, 1, 2),
@@ -129,6 +142,76 @@ describe('contextLens projection: request lifecycle', () => {
     ])
     expect(view.latest!.usage).toBeUndefined()
     expect(view.latest!.cache?.drop).toBe(false)
+  })
+})
+
+describe('contextLens projection: step/end lifecycle (real loop shape)', () => {
+  // The real agent loop emits step/start → … → step/end (always, even on
+  // error/abort) → turn/end once per turn. The projection must finalize
+  // intermediate steps at the next step/start as completed — not failed.
+
+  it('finalizes every step of a multi-step turn as completed', () => {
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      message(3, 1, 1, usage(100, 50)),
+      ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
+      startStep(1, 2, 5),
+      message(6, 1, 2, usage(200, 60)),
+      ev('step/end', { turn: 1, step: 2 }, { seq: 7 }),
+      endTurn(8, 1),
+    ])
+    expect(view.recentRequests.map(r => `${r.id}:${r.status}`)).toEqual(['1:1:completed', '1:2:completed'])
+    expect(view.summary.totalRequests).toBe(2)
+  })
+
+  it('keeps an aborted no-message step aborted when step/end precedes turn/end', () => {
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      ev('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'partial' } }, { seq: 3 }),
+      ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
+      endTurn(5, 1, 'aborted'),
+    ])
+    expect(view.latest!.status).toBe('aborted')
+    expect(view.latest!.usage).toBeUndefined()
+  })
+
+  it('marks a message-less errored step failed even when step/end closed it', () => {
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      ev('step/end', { turn: 1, step: 1 }, { seq: 3 }),
+      endTurn(4, 1, 'error'),
+    ])
+    expect(view.latest!.status).toBe('failed')
+  })
+
+  it('closes a step that ended with a message but whose turn crashed as completed', () => {
+    // step/end fired and the step produced a message, but the turn never
+    // ended (crash between step/end and turn/end): the step itself is
+    // complete, so it is not the failed-orphan case.
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      message(3, 1, 1, usage(100, 50)),
+      ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
+      startStep(2, 1, 5),
+      message(6, 2, 1, usage(100, 50)),
+      endTurn(7, 2),
+    ])
+    expect(view.recentRequests.map(r => `${r.id}:${r.status}`)).toEqual(['1:1:completed', '2:1:completed'])
+  })
+
+  it('ignores a step/end that does not match the pending step', () => {
+    const { view } = foldProjection([
+      headerEvent(1),
+      startStep(1, 1, 2),
+      message(3, 1, 1, usage(100, 50)),
+      ev('step/end', { turn: 1, step: 99 }, { seq: 4 }),
+      endTurn(5, 1),
+    ])
+    expect(view.latest!.status).toBe('completed')
   })
 })
 
@@ -303,6 +386,29 @@ describe('contextLens projection: replay consistency', () => {
     expect(byId.get('4:1')!.status).toBe('completed')
     expect(byId.get('5:1')!.status).toBe('aborted')
     expect(view.summary.totalRequests).toBe(6)
+  })
+
+  it('serves the view through the projection schema, exactly as the registry read path does', () => {
+    // The real session-projection registry runs schema.parse on every
+    // snapshot read; a view that fails it makes the projection unreadable
+    // in the live runtime even though every field-level assertion passes.
+    // Regression: the strict toolsDiffSchema once rejected the emitted
+    // `orderChanged` field (caught by the real-runtime smoke).
+    const { view } = foldProjection(scenarioLog())
+    expect(() => contextLensProjectionDefinition.schema.parse(view)).not.toThrow()
+    const noDiff = contextLensProjectionDefinition.view(foldProjection([
+      ev('request/header', { header: epochHeader('system', [toolSchema('tool-a')]), reason: 'initial' }, { seq: 1 }),
+      ev('request/context', { provider: 'p', model: 'm', contextWindow: 4096 }, { seq: 2 }),
+      ev('step/start', { turn: 1, step: 1 }, { seq: 3 }),
+      ev('assistant/message', {
+        turn: 1,
+        step: 1,
+        message: assistantMessage([textBlock('ok')]),
+        usage: usage(100, 10),
+      }, { seq: 4 }),
+      ev('turn/end', { turn: 1, reason: turnEndReason('completed') }, { seq: 5 }),
+    ]).state)
+    expect(() => contextLensProjectionDefinition.schema.parse(noDiff)).not.toThrow()
   })
 })
 

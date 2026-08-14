@@ -4,3 +4,6 @@ dsh-main/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# smoke artifacts
+smoke/out/

@@ -11,7 +11,11 @@
  * on change — so a request without its own header event carries the latest
  * committed snapshot. Retries (`llm/retry`) stay inside the same step and
  * never mint a new record; the final `assistant/message` usage replaces any
- * earlier sample for the same step.
+ * earlier sample for the same step. Finalization: the loop always emits
+ * `step/end` (even on error/abort) before `turn/end`; the last step of a
+ * turn finalizes at `turn/end` with the turn's end reason, intermediate
+ * steps finalize at the next `step/start` carrying the `step/end` marker,
+ * and a crash-orphaned step (neither marker) closes as failed.
  *
  * @module dsh-context-lens/projection
  */
@@ -50,6 +54,8 @@ interface PendingRequest {
   header: HeaderFingerprint | null
   contextWindow?: number
   sawMessage: boolean
+  /** Whether the loop closed the step with `step/end` (it always does, even on error/abort). */
+  stepEnded: boolean
   usage?: RequestUsage
   /** Heuristic surface estimate accumulated before this step started. */
   surfaceAtStart: number
@@ -124,6 +130,8 @@ const toolsDiffSchema = z.object({
   added: z.array(z.string()),
   removed: z.array(z.string()),
   modified: z.array(z.string()),
+  // Tool declaration order is a first-class committed change (model-observable).
+  orderChanged: z.boolean(),
 }).strict()
 
 const likelyCauseSchema = z.enum([
@@ -202,7 +210,13 @@ function finalize(state: ContextLensState, pending: PendingRequest): ContextLens
     step: pending.step,
     seq: pending.seq,
     time: pending.time,
-    status: pending.sawMessage && pending.turnEnd !== undefined ? 'completed'
+    // A message plus a closed step (`step/end`) or an ended turn finalizes
+    // completed; an aborted turn without a message is aborted; everything
+    // else — an error turn, or a crash-orphaned step with neither marker —
+    // is failed. The loop always emits `step/end` before `turn/end`, so an
+    // intermediate step of a multi-step turn finalizes at the next
+    // `step/start` with `stepEnded` set.
+    status: pending.sawMessage && (pending.turnEnd !== undefined || pending.stepEnded) ? 'completed'
       : pending.turnEnd === 'aborted' ? 'aborted'
         : 'failed',
     ...provider === undefined ? {} : { provider },
@@ -294,10 +308,22 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
             header: base.epoch,
             ...base.epochContext?.contextWindow === undefined ? {} : { contextWindow: base.epochContext.contextWindow },
             sawMessage: false,
+            stepEnded: false,
             surfaceAtStart: base.surfaceCarry,
             surfaceTokens: 0,
           },
         }
+      }
+      case 'step/end': {
+        // The loop closes every step with `step/end` (always, even on
+        // error/abort, before `turn/end`). Mark the pending span closed so a
+        // later finalization can tell a cleanly ended step from a crash
+        // orphan; finalization itself still happens at `turn/end` or at the
+        // next `step/start`.
+        if (state.pending === null) return state
+        const pending = state.pending
+        if (pending.turn !== event.data.turn || pending.step !== event.data.step) return state
+        return { ...state, pending: { ...pending, stepEnded: true } }
       }
       case 'user/message': {
         if (state.pending === null) {

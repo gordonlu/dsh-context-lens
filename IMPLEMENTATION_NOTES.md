@@ -13,8 +13,8 @@ Engineering notes for dsh-context-lens v0.1. The READMEs carry the product story
 
 ## Request lifecycle (one record per step)
 
-- `step/start` opens a pending record; a crash-orphaned pending (no `turn/end` ever) closes as **failed** at the next `step/start`.
-- `turn/end` finalizes. Status matrix: message present **and** turn ended → `completed`; no message and `aborted` → `aborted`; no message and `error` → `failed`; message but no turn end (orphan) → `failed`.
+- The real agent loop emits `step/start` … `step/end` (always — even on error/abort, `step/end` lands in a `finally`) … `turn/end` once per turn. The fold mirrors that shape: `step/start` opens a pending record; `step/end` marks the span closed (`stepEnded`); `turn/end` finalizes the last pending with the turn's end reason; intermediate steps finalize at the next `step/start` carrying the `step/end` marker. A crash-orphaned pending (no `step/end`, no `turn/end`) closes as **failed** at the next `step/start`.
+- Status matrix: message present **and** (turn ended **or** `step/end` closed the step) → `completed`; no message and `aborted` → `aborted`; no message and `error` → `failed`; message but neither marker (crash orphan) → `failed`.
 - Retries re-emit `request/header` inside the step; the pending record is updated, never duplicated. The final `assistant/message` usage replaces any earlier `assistant/chunk` usage sample.
 - Usage arrives only via `assistant/message` (explicit `usage` field) or an `assistant/chunk` of type `usage`. Anything else stays absent — `unavailable`, never `0`.
 - The retained window keeps the newest 100 records (`MAX_RETAINED_REQUESTS`); counters (`totalRequests`, `cacheDrops`, `structuralChanges`) are cumulative and survive trimming.
@@ -54,7 +54,7 @@ Note: registry `dsh-session-projection` declares `zod@^4.4.3` while this project
 
 - Node entries `lib/index.js` + `lib/invariant.js` (ESM, `.js` forced — the package declares `"type": "module"`).
 - Browser entry `lib/client.js`: CommonJS closure-factory artifact matching the harness loader contract — `window.__ModuleLoader__.load({ id: "dsh-context-lens", factory: (require) => { … return module.exports } })` with `var module = { exports: {} }` intro.
-- Externals = the loader's module-table entries (`CLIENT_EXTERNALS`: react, react/jsx-runtime, react-dom, react-dom/client, `@deepseek-ai/cordis`, `dsh-client-ui-slots`, `dsh-client-web-react`, `dsh-client-ui-primitives`, `dsh-client-ui-attachment`, `dsh-client-schema-form`, `@deepseek-ai/dsh-client-runtime/client`); everything else inlines (`deps.neverBundle` / `deps.alwaysBundle`).
+- Externals = the loader's module-table entries. The keys MUST be the shell's frozen `PLATFORM_MODULES` (`@deepseek-ai/dsh-client-web/src/platform.ts`) plus the runtime registration — every dsh-* key is `@deepseek-ai`-scoped there; the `CLIENT_EXTERNALS` list is asserted against the shell source by `smoke/client-smoke.mts`. Everything else inlines (`deps.neverBundle` / `deps.alwaysBundle`).
 - CSS Modules go through a virtual-id plugin (`\0dsh-css:` + `.mjs`, so tsdown's `.css` guard never sees them), compiled by lightningcss (`[hash]_[local]`, minified), and emitted as one idempotent `<style data-plugin="dsh-context-lens" data-plugin-css="…">` tag per module file. `addWatchFile` keeps the physical stylesheet in the watch graph.
 
 ## Test suite (53 tests)

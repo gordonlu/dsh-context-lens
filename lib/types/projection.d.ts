@@ -11,7 +11,11 @@
  * on change — so a request without its own header event carries the latest
  * committed snapshot. Retries (`llm/retry`) stay inside the same step and
  * never mint a new record; the final `assistant/message` usage replaces any
- * earlier sample for the same step.
+ * earlier sample for the same step. Finalization: the loop always emits
+ * `step/end` (even on error/abort) before `turn/end`; the last step of a
+ * turn finalizes at `turn/end` with the turn's end reason, intermediate
+ * steps finalize at the next `step/start` carrying the `step/end` marker,
+ * and a crash-orphaned step (neither marker) closes as failed.
  *
  * @module dsh-context-lens/projection
  */
@@ -31,6 +35,8 @@ interface PendingRequest {
     header: HeaderFingerprint | null;
     contextWindow?: number;
     sawMessage: boolean;
+    /** Whether the loop closed the step with `step/end` (it always does, even on error/abort). */
+    stepEnded: boolean;
     usage?: RequestUsage;
     /** Heuristic surface estimate accumulated before this step started. */
     surfaceAtStart: number;

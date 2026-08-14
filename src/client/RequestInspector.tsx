@@ -164,7 +164,9 @@ export function RequestInspector(props: RequestInspectorProps) {
           />
           <MainStat
             label={t('inspector.cacheImpact')}
-            value={cache?.deltaPoints === undefined ? '—' : `${Math.round(cache.deltaPoints)} pt`}
+            value={cache?.deltaPoints === undefined
+              ? '—'
+              : `${cache.deltaPoints > 0 ? '+' : ''}${Math.round(cache.deltaPoints)}%`}
             {...cache?.deltaPoints === undefined || cache.deltaPoints === 0
               ? { detail: t('inspector.noChange') }
               : {}}

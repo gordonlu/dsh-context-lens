@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>cover-en</title>
+<style>
+  /* 小红书封面 3:4 · 1242×1656 · 色值从真实产品 UI 抽取 */
+  :root {
+    --bg: #0f1420;          /* 封面深底（带蓝味，非纯黑霓虹） */
+    --panel: #171d2b;       /* UI 卡底 */
+    --panel-line: rgba(255,255,255,0.08);
+    --ink: #eef2f8;         /* 主文字（浅色主题反相） */
+    --ink-2: #9aa4b8;       /* 次级 */
+    --ok: #3ddc84;          /* 绿色（深底上用亮绿） */
+    --bad: #ff6b6b;         /* 红 */
+    --accent: #7aa2ff;      /* 蓝 */
+    --mono: ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1242px; height: 1656px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, 'PingFang SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+    padding: 96px 84px 72px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .tag { align-self: flex-start; display: inline-flex; gap: 10px; font-size: 26px; color: var(--ink-2); letter-spacing: 0.08em; }
+  .tag b { color: #9db8ff; font-weight: 700; }
+  .title {
+    margin-top: 36px;
+    font-size: 72px; line-height: 1.22; font-weight: 900;
+    letter-spacing: -0.01em;
+  }
+  .title .brand { color: #9db8ff; font-weight: 900; }
+  .title .lens { color: var(--accent); position: relative; }
+  .title .lens::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 6px; height: 14px;
+    background: linear-gradient(90deg, transparent, rgba(122,162,255,0.35), transparent);
+  }
+  .sub {
+    margin-top: 28px; font-size: 38px; color: var(--ink-2); line-height: 1.5;
+  }
+  .sub b { color: var(--ink); font-weight: 600; }
+  .ui {
+    margin-top: 56px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 24px;
+    padding: 40px 40px 44px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  }
+  .ui-bar { display: flex; gap: 16px; align-items: center; font-size: 26px; color: var(--ink-2); padding-bottom: 28px; border-bottom: 1px solid var(--panel-line); }
+  .ui-bar .dot { width: 14px; height: 14px; border-radius: 50%; background: #ff5f57; }
+  .ui-bar .dot:nth-child(2) { background: #febc2e; }
+  .ui-bar .dot:nth-child(3) { background: #28c840; }
+  .ui-bar span.title { font-size: 26px; font-weight: 600; color: var(--ink); margin-left: 10px; }
+  .strip { display: flex; gap: 14px; margin-top: 30px; }
+  .chip { flex: 1; background: rgba(255,255,255,0.06); border-radius: 14px; padding: 20px 22px; }
+  .chip .k { font-size: 22px; color: var(--ink-2); }
+  .chip .v { margin-top: 8px; font-size: 30px; font-weight: 700; }
+  .chip.ok .v { color: var(--ok); }
+  .rows { margin-top: 30px; display: flex; flex-direction: column; gap: 14px; }
+  .row {
+    display: flex; align-items: center; gap: 20px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px; padding: 22px 24px;
+    font-size: 28px;
+  }
+  .row .n { font-family: var(--mono); color: var(--ink-2); font-size: 26px; min-width: 74px; }
+  .row .t { flex: 1; font-weight: 600; }
+  .row .c { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .row.ok .t { color: var(--ink); } .row.ok .c { color: var(--ok); }
+  .row.bad .t { color: var(--bad); } .row.bad .c { color: var(--bad); }
+  .row.bad { outline: 1px solid rgba(255,107,107,0.35); }
+  .row .mark { color: var(--bad); font-weight: 900; font-size: 32px; }
+  .install {
+    margin-top: 56px; flex: 1;
+    background: #0b0f18;
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    padding: 30px 34px;
+    font-family: var(--mono);
+    font-size: 30px; color: #c9d4e8;
+  }
+  .install .prompt { color: var(--accent); }
+  .install .ok-line { color: var(--ok); }
+  .foot {
+    margin-top: auto; padding-top: 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 24px; color: var(--ink-2);
+  }
+  .foot .points { display: flex; gap: 26px; }
+  .foot .points span::before { content: '·'; color: var(--accent); font-weight: 900; margin-right: 10px; }
+</style>
+</head>
+<body>
+  <div class="tag">Open source · <b>DeepSeek Harness</b> plugin</div>
+  <div class="title">Stayed up late building a<br><span class="lens">"lens"</span> for <span class="brand">DeepSeek Harness</span></div>
+  <div class="sub">Every model request — <b>cache reuse</b>, <b>system prompt</b>, <b>tools</b>: see what changed at a glance.<br>Anomalies highlighted automatically.</div>
+
+  <div class="ui">
+    <div class="ui-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="title">Request Context</span></div>
+    <div class="strip">
+      <div class="chip ok"><div class="k">Cache</div><div class="v">✓ Stable</div></div>
+      <div class="chip ok"><div class="k">Structure</div><div class="v">✓ Stable</div></div>
+      <div class="chip"><div class="k">Requests</div><div class="v">358</div></div>
+    </div>
+    <div class="rows">
+      <div class="row ok"><span class="n">#358</span><span class="t">Stable</span><span class="c">cache 100%</span></div>
+      <div class="row bad"><span class="n">#355</span><span class="t">Tools changed</span><span class="c">cache 63%</span><span class="mark">⚠</span></div>
+      <div class="row bad"><span class="n">#354</span><span class="t">System changed</span><span class="c">cache 41%</span><span class="mark">⚠</span></div>
+    </div>
+  </div>
+
+  <div class="install">
+    <span class="prompt">$</span> dsh plugin --profile web add dsh-context-lens<br>
+    <span class="ok-line">✓ Done in 8s — pure observer, no injection, zero extra calls</span>
+  </div>
+
+  <div class="foot">
+    <div class="points">
+      <span>Read-only log</span><span>zh/en</span><span>on npm</span>
+    </div>
+    <div>GitHub · dsh-context-lens</div>
+  </div>
+</body>
+</html>

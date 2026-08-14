@@ -127,6 +127,7 @@ DSH_SMOKE_HARNESS="$HARNESS" "$HARNESS/node_modules/.bin/tsx" --tsconfig "$HARNE
 
 ## 7. 版本记录
 
+- `ede0b97`（2026-08-14）：v0.1.2 完整 GUI E2E（`smoke/e2e.mts`，第二个 web 实例 + mock LLM + 真实浏览器，17 断言）+ 修复 bug #4（Config 默认值），60 测试。
 - `cb43346`（2026-08-14）：v0.1.1 真实运行时冒烟（`smoke/`）+ 修复冒烟抓到的 3 个 bug（schema `orderChanged`、`step/end` 折叠、客户端 external scope），60 测试。
 - `598e692`（2026-08-14）：v0.1 全量交付（248 files）。
 - 前置占位提交 `37fb987` 无实质内容。

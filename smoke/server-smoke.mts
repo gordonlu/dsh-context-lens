@@ -203,6 +203,10 @@ async function main(): Promise<number> {
 
   // The plugin under test: built server half, mounted like a profile row.
   await ctx.plugin({ name: lens.name, inject: lens.inject, apply: lens.apply } as never)
+  // A profile row with no `config` key passes undefined through fiber config
+  // resolution; the schema must default it (regression: bare z.object({})
+  // rejected undefined with "Required" and the row failed to boot).
+  check('Config schema defaults a config-less row', JSON.stringify(lens.Config.parse(undefined)) === '{}')
   check('plugin apply mounted the contextLens projection', ctx.sessionProjections !== undefined)
   const registered = (ctx.sessionProjections as unknown as {
     registrations?: Map<string, unknown>

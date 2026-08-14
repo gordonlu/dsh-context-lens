@@ -22,7 +22,13 @@ export const inject: readonly string[] = []
 
 export type Config = Readonly<Record<string, never>>
 
-export const Config = z.object({}) as unknown as z.ZodType<Config>
+/**
+ * Empty config with a default: a loader row mounting this plugin with no
+ * `config` key passes `undefined` through fiber config resolution, and a
+ * bare `z.object({})` rejects undefined with "Required" — every profile
+ * patch that inserts the row without config would fail to boot.
+ */
+export const Config = z.object({}).default({}) as unknown as z.ZodType<Config>
 
 /**
  * Install the observer: register the `contextLens` projection unit when the

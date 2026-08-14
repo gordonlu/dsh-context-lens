@@ -61,17 +61,18 @@ cordis.patch.yml      dsh bundle patch 元数据（dsh.client.inject 声明）
 - 服务端全链路：投影 fold、指纹、缓存数学、diff（含 `orderChanged`）、保留 100、累计计数；**`step/end` 折叠**（多步回合中间步正确标 completed）。
 - 客户端四组件 + 中英语言包 + CSS Modules；`useProjection('contextLens')` 席位读取。
 - 构建：`lib/client.js` 是标准闭包工厂 ABI（`window.__ModuleLoader__.load({ id: "dsh-context-lens", factory: (require) => … })`，react/jsx-runtime 走 loader require，其余内联），已用 `node -e "import('./lib/index.js')"` 冒烟过 node 端。
-- **真实运行时冒烟（§5）已完成**：60 测试全绿（指纹规范化、缓存数学、diff、生命周期/孤儿/重放一致性、schema 读路径回归、step/end 生命周期）。
-- 冒烟抓到并修复 3 个"单测看不见"的 bug（详见 §5.1）：schema 缺 `orderChanged`（真实 registry 读路径会炸）、`step/end` 未折叠（多步回合中间步误标 failed）、客户端 external 用了无 scope 的模块表 key（真实浏览器会 miss table）。
+- **真实运行时冒烟（§5）三层全过**：服务端（真实包 + AgentLoop，55 断言）、客户端 ABI（真实 loader + SlotRegistry + locale，12 断言）、完整 GUI E2E（第二个 web 实例 + mock LLM + 真实浏览器，17 断言）。60 测试全绿。
+- 冒烟抓到并修复 4 个"单测看不见"的 bug（详见 §5.1）：schema 缺 `orderChanged`、`step/end` 未折叠、客户端 external 无 scope key、无 config row 挂载失败。
 
-**未完成 / 未验证（下一条主线）**
-- ⛔ 完整 GUI 会话 E2E（§5.2）：真实浏览器里插槽渲染（视图组件 + 投影席位）、中英切换 UI、`/plugins/dsh-context-lens/client.js` 服务路径 —— 需要第二个 `dsh web` 实例 + 真实模型路由。
+**未完成 / 未验证（低优先级）**
+- 带真实缓存波动的会话里看回落横幅 + likelyCauses 的渲染路径（mock usage 固定，触发不了；服务端逻辑已覆盖）。
+- `dsh plugin add` 正式安装路径（symlink + patch 挂载已验证）。
 
-## 5. 真实环境冒烟：已完成 + 剩余
+## 5. 真实环境冒烟：已完成（服务端 + 客户端 ABI + 完整 GUI E2E）
 
 ### 5.1 已完成的冒烟（本机 harness checkout 上跑通）
 
-`smoke/` 两个脚本，直接复用本机 `/data/code/deepseek-harness` checkout 的**真实包**（tsconfig paths 解析，非 vendor-stubs）：
+`smoke/` 三个脚本，直接复用本机 `/data/code/deepseek-harness` checkout 的**真实包**（tsconfig paths 解析，非 vendor-stubs）：
 
 ```sh
 HARNESS=/data/code/deepseek-harness
@@ -83,22 +84,26 @@ TSX="$HARNESS/node_modules/.bin/tsx"
 # 客户端：lib/client.js 按真实 loader 方式加载，external 对照 shell 真实
 # PLATFORM_MODULES 校验，挂进真实 SlotRegistry + 真实 locale 插件，12 项断言
 DSH_SMOKE_HARNESS="$HARNESS" "$TSX" --tsconfig "$HARNESS/tsconfig.json" smoke/client-smoke.mts
+# 完整 GUI E2E（见 smoke/README.md 的启动步骤）：mock LLM + 独立 DSH_HOME 的
+# 第二个 web 实例 + 真实浏览器，17 项断言
+"$TSX" smoke/e2e.mts
 ```
 
 验证结论：
 - 投影在真实 SessionProvider/registry 里注册、驱动、读取全通；`request/header`/`request/context`/`step/end` 等事件形状与 vendor 类型一致；读路径 schema 校验通过。
 - 客户端 bundle 通过真实 loader ABI 加载，CSS 注入、插槽注册（id/order/locale）、真实 locale 翻译、dispose 清理全部正常。
+- **GUI E2E**：第二个 web 实例（`--profile web --port 3081` + 独立 DSH_HOME + DEEPSEEK_* 指向 mock LLM）真实浏览器里：`/plugins/dsh-context-lens/client.js` 200、boot manifest 含 entry、CSS 注入、`请求上下文`/`Request Context` tab 渲染、Overview（请求/回落/结构变化）、记录列表 + 检查器（usage 桶、unavailable 语义）、两轮真实会话两条记录、zh↔en 切换闭环、无页面错误。
 
-**冒烟抓到并修复的 3 个 bug（单测看不见，回归测试已补）**：
+**冒烟抓到并修复的 4 个 bug（单测看不见，回归测试已补）**：
 1. `toolsDiffSchema`（strict）漏了 `orderChanged` 字段 → 真实 registry `snapshot()` 读路径抛 `unrecognized_keys`，投影在真实运行时读不出来。修 schema + 加"view 输出过 schema.parse"回归测试。
 2. 投影不折叠 `step/end` → 真实 loop 的多步回合中间步被孤儿路径误标 `failed`（单测的合成 log 每步都发 turn/end，没暴露）。修 fold（`stepEnded` 标记）+ 6 个 step/end 生命周期测试。
 3. `CLIENT_EXTERNALS` 五个 dsh-* 用的是无 scope 的 key（`dsh-client-ui-slots` 等），真实模块表是 `@deepseek-ai/` scope 的 → 真实浏览器会 miss table 加载失败。已改 scope 对齐，冒烟脚本会把该列表与 shell 的 `PLATFORM_MODULES` 源码逐项比对。
+4. 无 `config` 的 profile row 挂载失败：`Config = z.object({})` 对 `undefined` 报 Required → 整个插件树 boot 失败（E2E 起第二个实例时当场抓到）。已改 `z.object({}).default({})`，server-smoke 加断言。
 
-### 5.2 剩余：完整 GUI 会话 E2E（需要浏览器 + 真实模型路由）
+### 5.2 剩余（低优先级）
 
-1. 新 profile 起第二个 web 实例：`dsh plugin --profile <name> add <本仓库路径>`（bundle patch 机制，`cordis.patch.yml` 已就绪），换端口启动，确认 `/plugins/dsh-context-lens/client.js` 被服务。
-2. 开会话跑几轮（含一次系统提示/工具变化制造缓存回落），检查：投影卡片列表、检查器、回落横幅 + likelyCauses、工具顺序变化提示、中英切换。
-3. 任何渲染/时序问题改 `src/client/`（vendor 类型不动）。
+- 带真实缓存波动（cacheRead 变化）的会话里看回落横幅 + likelyCauses 的渲染路径（mock LLM 的 usage 固定为 3 tok，无法触发；服务端逻辑已由 server-smoke 覆盖）。
+- `dsh plugin --profile <name> add <path>` 正式安装路径尚未验证（E2E 用 symlink + profile patch 挂载）；理论上 `dsh.bundle` 声明齐全，但 pnpm peer 坑（§3）可能让它装不上 —— 需要时用 symlink 法。
 
 ### 5.3 事件形状核对记录
 

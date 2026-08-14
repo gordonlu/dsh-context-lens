@@ -34,6 +34,48 @@ Both exit non-zero on the first failing run's assertion count. `css-hook.mjs`
 is a node loader hook that lets plain node import real client packages whose
 sources carry `*.module.css` (their build pipeline inlines CSS; node cannot).
 
+## Full GUI E2E (smoke/e2e.mts)
+
+The real-browser end-to-end over a SECOND web instance with an isolated
+DSH_HOME and a mock LLM route — no provider keys, no touching the running
+GUI. Setup (all paths in the workspace so the browser script and the server
+share state):
+
+```sh
+HARNESS=/data/code/deepseek-harness
+HOME_E2E=/data/code/dsh-context-lens/.e2e-home   # gitignored
+
+# 1. mock LLM (OpenAI-compatible) on :8900
+cd "$HARNESS" && node --import tsx packages/test-support/llm-mock-server/src/bin.ts \
+  --port 8900 --api-key mock-key --sequence success --repeat-last \
+  --success-text "E2E mock reply from llm-mock-server" &
+
+# 2. second web instance on :3081, plugin mounted
+rm -rf "$HOME_E2E"
+DSH_HOME="$HOME_E2E" DSH_TELEMETRY_DISABLED=1 \
+DEEPSEEK_BASE_URL=http://127.0.0.1:8900/v1 DEEPSEEK_API_KEY=mock-key \
+  node --import tsx/esm "$HARNESS/apps/cli/src/bin.ts" --profile web --port 3081 &
+
+# 3. mount the plugin (after first boot healed the profile fallback):
+ln -sfn /data/code/dsh-context-lens "$HOME_E2E/profiles/node_modules/dsh-context-lens"
+cat > "$HOME_E2E/profiles/web/cordis.patch.yml" <<'YAML'
+- insert:
+    - id: context-lens
+      name: dsh-context-lens
+YAML
+# …then restart the web instance.
+
+# 4. run the E2E
+"$HARNESS/node_modules/.bin/tsx" smoke/e2e.mts
+```
+
+The E2E asserts: bundle serving + loader ABI, boot manifest entry, plugin CSS
+injection, the 请求上下文 / Request Context tab in the conversation.view
+slot, overview strip counters, per-record list + inspector (usage buckets,
+unavailable semantics), a second real turn producing a second record, and the
+zh ↔ en language round-trip. Uses the checkout's playwright with the
+installed ms-playwright chromium (`E2E_CHROMIUM` overrides).
+
 ## What the smoke found (v0.1 → fixed)
 
 1. **`orderChanged` schema gap** — the strict `toolsDiffSchema` did not
@@ -51,11 +93,15 @@ sources carry `*.module.css` (their build pipeline inlines CSS; node cannot).
    `@deepseek-ai/`-scoped; the bundle would have missed the loader table in
    the real browser. Scoped now, and the smoke asserts the list against
    `PLATFORM_MODULES` read from the shell source.
+4. **Config-less profile rows failed to boot** — `Config = z.object({})`
+   rejects `undefined` with "Required", so a profile patch inserting the row
+   without a `config` key failed the whole plugin tree. Now
+   `z.object({}).default({})`; the server smoke asserts it.
 
-## Not covered (still needs a full GUI session)
+## Coverage notes
 
-Slot RENDERING in the real web app (the view components run against a live
-conversation + projection seat), locale switching UI, and the
-`/plugins/dsh-context-lens/client.js` serving path through a booted web
-profile. That requires a second `dsh web` instance on another port with this
-package added as a profile bundle (`dsh plugin --profile <name> add .`).
+The mock LLM reports a fixed `prompt_tokens: 3`, so the reuse ratio is
+constant and the drop banner cannot trigger in the E2E — the drop alarm,
+`likelyCauses` ranking, and `step/end` lifecycle are covered by
+server-smoke instead. Slot RENDERING of the diff details and the drop banner
+UI paths still await a session with real cache-usage variance.

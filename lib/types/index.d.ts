@@ -14,6 +14,12 @@ export declare const name = "context-lens";
 /** The plugin needs no services up front; the projection registry is an optional child. */
 export declare const inject: readonly string[];
 export type Config = Readonly<Record<string, never>>;
+/**
+ * Empty config with a default: a loader row mounting this plugin with no
+ * `config` key passes `undefined` through fiber config resolution, and a
+ * bare `z.object({})` rejects undefined with "Required" — every profile
+ * patch that inserts the row without config would fail to boot.
+ */
 export declare const Config: z.ZodType<Config>;
 /**
  * Install the observer: register the `contextLens` projection unit when the

@@ -64,3 +64,15 @@ Note: registry `dsh-session-projection` declares `zod@^4.4.3` while this project
 - `cache.spec.ts` — billed/reuse math, absent-fields-are-absent, drop thresholds, surface alarms, exported constants.
 - `diff.spec.ts` — unchanged/change detection, add/remove/modify, `orderChanged`, schema-key-order non-issue, cache boundary, cause ranking + fallback.
 - `projection.spec.ts` — lifecycle (epoch carry, mid-step header replacement, retry-in-step, abort/error statuses, crash orphans, usage absence, retention + cumulative counters), surface estimates, replay consistency (live ≡ replay ≡ chunked, with a 27-event scenario log covering multi-step turns, retry, abort, missing/late usage, tool reorder, schema change, model/config change), determinism.
+
+## Versioning policy (in force)
+
+- **Prefer patch increments.** Routine fixes, UI refinements, and small
+  features bump the patch digit (`0.2.1`, `0.2.2`, …) — `pnpm version patch`
+  and `npm publish` is the whole flow; the `prepublishOnly` gate runs
+  typecheck + tests + build automatically.
+- **Minor increments are reserved** for breaking changes or substantial new
+  surface (the 0.1.0 → 0.2.0 jump covered the change-first UI redesign and
+  the publish-readiness cleanup; nothing since then justifies another).
+- The npm version and the `vX.Y.Z` git tag must stay in sync on every
+  release.

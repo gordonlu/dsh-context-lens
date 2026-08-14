@@ -11,9 +11,9 @@ export declare const NS: "context-lens";
 export declare const zh: {
     readonly 'view.context': "请求上下文";
     readonly 'overview.title': "概览";
-    readonly 'overview.requests': "请求 {count}";
-    readonly 'overview.cacheDrops': "缓存回落 {count}";
-    readonly 'overview.structuralChanges': "结构变化 {count}";
+    readonly 'overview.requests': "请求";
+    readonly 'overview.cacheDrops': "缓存回落";
+    readonly 'overview.structuralChanges': "结构变化";
     readonly 'list.title': "最近请求";
     readonly 'list.empty': "还没有 LLM 请求。发送一条消息后这里会出现每次请求的结构变化与缓存复用情况。";
     readonly 'list.cache': "缓存 {percent}%";
@@ -36,6 +36,8 @@ export declare const zh: {
     readonly 'inspector.configHash': "配置";
     readonly 'inspector.systemHash': "系统提示";
     readonly 'inspector.tools': "工具 {count}";
+    readonly 'inspector.tools.show': "工具明细 {count}";
+    readonly 'inspector.tools.hide': "收起工具明细";
     readonly 'inspector.model': "模型";
     readonly 'inspector.contextWindow': "上下文窗口";
     readonly 'inspector.diff.title': "与上次请求的差异";

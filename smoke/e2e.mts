@@ -150,10 +150,16 @@ async function main(): Promise<number> {
   // 4. Lens tab + panel (Chinese baseline).
   let panel = await openLensPanel()
   check('lens tab label is 请求上下文 (zh)', (await tabs()).includes('请求上下文'), await tabs())
-  check('overview strip shows 请求 count', panel.includes('请求 {count}') || panel.includes('Requests {count}'))
+  // The overview chips must interpolate their {count} templates — a raw
+  // placeholder would mean the translate call missed its parameters, and a
+  // duplicated number means the label AND the value both rendered it.
+  check('overview chip counts interpolated (no {count} literals)', !panel.includes('{count}') && !panel.includes('{percent}'), panel.includes('{count}'))
+  check('overview strip shows request count', /(请求|Requests)[\s\S]{0,30}\d+/.test(panel), panel.includes('{count}') ? 'placeholder present' : 'ok')
+  check('overview chip number rendered once, not twice', !/(请求|Requests)\s+(\d+)\s+\2/.test(panel), 'ok')
   check('record 1:1 listed as completed', /1:1[\s\S]{0,40}(完成|Completed)/.test(panel), panel.slice(0, 400).replace(/\n+/g, ' '))
   check('usage bucket shows uncached input 3 (mock prompt_tokens)', /(输入\(未缓存\)|Uncached input)[\s\S]{0,20}3/.test(panel))
   check('cache read stays unavailable, never 0', /(缓存读取|Cache read)[\s\S]{0,20}unavailable/.test(panel))
+  check('no doubled percent sign (100%% regression)', !panel.includes('%%'), panel.includes('%%') ? '%% found' : 'ok')
 
   // 5. Second real turn → second record, diff computed without structural change.
   const input2 = page.locator('textarea:not([readonly]), [contenteditable="true"]').first()
@@ -163,6 +169,10 @@ async function main(): Promise<number> {
   await page.waitForTimeout(12000)
   panel = await openLensPanel()
   check('record 2:1 listed after the second turn', /2:1[\s\S]{0,40}(完成|Completed)/.test(panel), /2:1[\s\S]{0,40}(完成|Completed)/.test(panel) ? 'ok' : panel.slice(0, 600).replace(/\n+/g, ' '))
+  // The list renders newest first: 2:1's card must appear before 1:1's.
+  const first21 = panel.indexOf('2:1')
+  const first11 = panel.indexOf('1:1')
+  check('list renders newest request first', first21 !== -1 && first11 !== -1 && first21 < first11, { first21, first11 })
 
   // 5. Language switch zh → en and back.
   const enTabs = await switchLanguage('en')

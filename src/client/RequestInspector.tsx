@@ -5,6 +5,7 @@
  * changes with the correlation disclaimer.
  */
 
+import { useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LikelyCause, RequestRecord } from '../types.ts'
 import type { ContextLensKey } from './locales.ts'
@@ -84,6 +85,9 @@ function ToolsOrderDiff(props: { orderChanged: boolean; t: PropsLocale<typeof NS
 
 export function RequestInspector(props: RequestInspectorProps) {
   const { request, t } = props
+  // The per-request tool detail is usually identical to every other request
+  // in the session; keep it folded so the inspector leads with what changed.
+  const [toolsOpen, setToolsOpen] = useState(false)
   if (request === null) return <div className={css.inspector}>{t('list.empty')}</div>
   const { usage, cache, header, diffFromPrevious } = request
   const diff = diffFromPrevious
@@ -133,14 +137,26 @@ export function RequestInspector(props: RequestInspectorProps) {
           )}
         </div>
         {header.tools.length > 0 && (
-          <div className={css.toolList}>
-            {header.tools.map(tool => (
-              <div key={tool.name} className={css.toolRow}>
-                <span className={css.toolName}>{tool.name}</span>
-                <span className={css.mono}>{shortHash(tool.schemaHash)}</span>
-                <span className={css.dim}>{formatTokens(tool.estimatedTokens)} tok</span>
+          <div className={css.toolsFold}>
+            <button
+              type="button"
+              className={css.toolsToggle}
+              onClick={() => setToolsOpen(open => !open)}
+            >
+              <span className={css.toolsToggleIcon}>{toolsOpen ? '▾' : '▸'}</span>
+              {toolsOpen ? t('inspector.tools.hide') : t('inspector.tools.show', { count: String(header.tools.length) })}
+            </button>
+            {toolsOpen && (
+              <div className={css.toolList}>
+                {header.tools.map(tool => (
+                  <div key={tool.name} className={css.toolRow}>
+                    <span className={css.toolName}>{tool.name}</span>
+                    <span className={css.mono}>{shortHash(tool.schemaHash)}</span>
+                    <span className={css.dim}>{formatTokens(tool.estimatedTokens)} tok</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

@@ -6,12 +6,14 @@
  */
 
 /**
- * Format a ratio in [0, 1] as a whole-number percentage string.
+ * Format a ratio in [0, 1] as a whole-number percentage string WITHOUT the
+ * percent sign — locale templates own the `%` glyph (`'缓存 {percent}%'`),
+ * so a sign here would render `100%%`.
  * @param ratio - the ratio.
- * @returns e.g. `"83%"`.
+ * @returns e.g. `"83"`.
  */
 export function formatPercent(ratio: number): string {
-  return `${Math.round(ratio * 100)}%`
+  return `${Math.round(ratio * 100)}`
 }
 
 /**

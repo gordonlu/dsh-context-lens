@@ -1,7 +1,9 @@
 /**
- * The recent-requests list: newest last, one row per request. Rows show the
- * request status, its cache-reuse readout (or `usage n/a`), and a marker
- * when the request's header changed structurally against its predecessor.
+ * The recent-requests list: newest last, one card per request. The primary
+ * line is the status (pill) with a dimmed turn:step tag; the secondary line
+ * carries the model, the cache-reuse readout, and the structural-change /
+ * cache-drop badges. The status carries the visual weight — the seq is
+ * reference noise, not identity.
  */
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
 import type { RequestRecord } from '../types.ts';

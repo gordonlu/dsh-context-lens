@@ -72,7 +72,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   border-right: 1px solid var(--dsw-alias-button-ghost-active-border, rgba(128, 128, 128, 0.2));
   padding-right: 8px;
   color: var(--dsw-alias-label-caption, #8a919f);
@@ -80,11 +80,11 @@
 
 .listItem {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: none;
-  border-radius: 6px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -98,24 +98,80 @@
 
 .listItemSelected {
   background: var(--dsw-alias-interactive-bg-active, rgba(38, 49, 72, 0.1));
+  border-color: var(--dsw-alias-interactive-bg-active, rgba(38, 49, 72, 0.18));
 }
 
-.seq {
-  font-variant-numeric: tabular-nums;
+.itemLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statusPill {
+  flex: none;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--dsw-alias-label-primary, #1f2329);
-  min-width: 56px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+
+.statusPill_completed {
+  color: var(--dsw-static-green-700, #1b5e20);
+  background: var(--dsw-alias-interactive-bg-hover-success, rgba(27, 94, 32, 0.1));
+}
+
+.statusPill_failed {
+  color: var(--dsw-static-red-600, #c62828);
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+}
+
+.statusPill_aborted {
+  color: var(--dsw-static-orange-700, #e65100);
+  background: var(--dsw-alias-interactive-bg-hover-warning, rgba(230, 81, 0, 0.1));
 }
 
 .status {
   font-size: 12px;
-  color: var(--dsw-alias-label-caption, #8a919f);
-  min-width: 40px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.seq {
+  font-family: var(--ds-font-family-code, 'SF Mono', Consolas, monospace);
+  font-size: 11px;
+  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  min-width: 0;
 }
 
 .cacheCell {
+  margin-left: auto;
+  flex: none;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.cacheCellDrop {
+  color: var(--dsw-static-red-600, #c62828);
+}
+
+.modelCell {
+  font-size: 11px;
+  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.badges {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
 }
 
 .changedBadge {
@@ -195,11 +251,43 @@
   font-size: 11px;
 }
 
+.toolsFold {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.toolsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-caption, #8a919f);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.toolsToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
+
+.toolsToggleIcon {
+  font-size: 10px;
+  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+}
+
 .toolList {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .toolRow {

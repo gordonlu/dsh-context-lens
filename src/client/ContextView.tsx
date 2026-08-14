@@ -5,7 +5,7 @@
  * everything else arrives through the framework `useProjection` seat.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { globalOrdinal } from './request-summary.ts'
@@ -27,6 +27,33 @@ export function ContextView(props: ContextLensViewProps) {
   const { useProjection, t } = props
   const projection = useProjection('contextLens')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const rootRef = useRef<HTMLElement | null>(null)
+
+  // The conversation session's scrollport is SHARED across the view tabs
+  // (Chat / Trajectory / Context Lens). Switching tabs swaps the content but
+  // keeps the scroll position, so the lens panel would open scrolled into the
+  // middle of nothing. The slot re-mounts this view on every activation
+  // (`renderSlot` with `only: active.id`), so resetting the scrollport on
+  // mount puts the panel top in view exactly when the user switches to it.
+  useEffect(() => {
+    let node: HTMLElement | null = rootRef.current
+    let scroller: HTMLElement | null = null
+    while (node !== null) {
+      if (node.scrollHeight > node.clientHeight + 4) {
+        scroller = node
+        break
+      }
+      node = node.parentElement
+    }
+    if (scroller === null) return
+    // Enter at the top of the panel; restore the user's prior stream
+    // position when they switch back to Chat.
+    const enterTop = scroller.scrollTop
+    scroller.scrollTop = 0
+    return () => {
+      scroller.scrollTop = enterTop
+    }
+  }, [])
 
   const requests = useMemo(() => projection?.recentRequests ?? [], [projection])
   const selected = useMemo(
@@ -52,7 +79,7 @@ export function ContextView(props: ContextLensViewProps) {
   const previousOrdinal = selectedIndex <= 0 ? null : globalOrdinal(selectedIndex - 1, requests.length, projection.summary.totalRequests)
 
   return (
-    <section className={css.root}>
+    <section ref={rootRef} className={css.root}>
       <Overview
         summary={projection.summary}
         requests={requests}

@@ -55,6 +55,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install plugin dependencies (zod for lib/index.js)
+        working-directory: plugin
+        run: pnpm install --frozen-lockfile
       - name: Install harness dependencies
         if: env.HARNESS_OK == '1'
         working-directory: ${{ env.HARNESS }}

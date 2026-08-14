@@ -122,5 +122,6 @@ DSH_SMOKE_HARNESS="$HARNESS" "$HARNESS/node_modules/.bin/tsx" --tsconfig "$HARNE
 
 ## 7. 版本记录
 
+- `cb43346`（2026-08-14）：v0.1.1 真实运行时冒烟（`smoke/`）+ 修复冒烟抓到的 3 个 bug（schema `orderChanged`、`step/end` 折叠、客户端 external scope），60 测试。
 - `598e692`（2026-08-14）：v0.1 全量交付（248 files）。
 - 前置占位提交 `37fb987` 无实质内容。

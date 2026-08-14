@@ -141,7 +141,7 @@
 .seq {
   font-family: var(--ds-font-family-code, 'SF Mono', Consolas, monospace);
   font-size: 11px;
-  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  color: var(--dsw-alias-label-caption, #8a919f);
   min-width: 0;
 }
 
@@ -160,7 +160,7 @@
 
 .modelCell {
   font-size: 11px;
-  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  color: var(--dsw-alias-label-caption, #8a919f);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -242,7 +242,7 @@
 }
 
 .dim {
-  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  color: var(--dsw-alias-label-caption, #8a919f);
   font-size: 11px;
 }
 
@@ -280,7 +280,7 @@
 
 .toolsToggleIcon {
   font-size: 10px;
-  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  color: var(--dsw-alias-label-caption, #8a919f);
 }
 
 .toolList {
@@ -331,7 +331,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: var(--dsw-alias-label-dimmed, #b6bcc7);
+  color: var(--dsw-alias-label-caption, #8a919f);
 }
 
 .emptyTitle {

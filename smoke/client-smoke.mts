@@ -30,10 +30,12 @@ import { fileURLToPath } from 'node:url'
 // Make the REAL client packages loadable under plain node: their sources
 // import *.module.css, which their build pipeline inlines (see css-hook.mjs).
 import { register } from 'node:module'
+import type { Context } from '@deepseek-ai/cordis'
+// NOTE: this register() must run before the first import of a client package:
+// their sources import *.module.css (see css-hook.mjs), and static imports are
+// hoisted above any top-level statement — so the values are imported
+// dynamically, below.
 register(new URL('./css-hook.mjs', import.meta.url))
-import { Context } from '@deepseek-ai/cordis'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const BUNDLE_PATH = join(HERE, '..', 'lib', 'client.js')
@@ -70,6 +72,51 @@ async function main(): Promise<number> {
     if ((globalThis as Record<string, unknown>)[key] === undefined) {
       ;(globalThis as Record<string, unknown>)[key] = win[key as keyof typeof win]
     }
+  }
+
+  // 2. Mount the platform the way the shell does. Since 0.1.5 the browser
+  //    packages ship as `window.__ModuleLoader__` handoff bundles (their
+  //    `./client` entry is not an ES module), so the smoke drives the same
+  //    loader contract for them and for the plugin bundle below.
+  const requireFromHere = createRequire(import.meta.url)
+  const CLIENT_PLATFORM = new Set([
+    '@deepseek-ai/dsh-client-runtime',
+    '@deepseek-ai/dsh-client-locale',
+    '@deepseek-ai/dsh-client-ui-conversation',
+  ])
+  const loaded = new Map<string, Record<string, unknown>>()
+  const platformRequire = (spec: string): unknown => {
+    const cached = loaded.get(spec)
+    if (cached !== undefined) return cached
+    if (CLIENT_PLATFORM.has(spec)) return loadClientBundle(spec)
+    return requireFromHere(spec)
+  }
+  const loadClientBundle = (spec: string): Record<string, unknown> => {
+    const pkgJson = requireFromHere.resolve(`${spec}/package.json`)
+    const bundlePath = join(dirname(pkgJson), 'lib', 'client.js')
+    let handoff: Handoff | undefined
+    win.__ModuleLoader__ = { load: h => { handoff = h } }
+    new Function(readFileSync(bundlePath, 'utf8'))() // eslint-disable-line no-new-func -- deliberate loader fixture
+    if (handoff === undefined) throw new Error(`no loader handoff from ${spec}`)
+    const exports = handoff.factory(platformRequire)
+    loaded.set(spec, exports)
+    return exports
+  }
+  // Platform packages whose sources import CSS are loaded as ES modules first
+  // (the css hook answers their *.module.css), then served from the loader
+  // table — a bundle factory's require is synchronous.
+  for (const spec of [
+    '@deepseek-ai/cordis',
+    '@deepseek-ai/dsh-client-store',
+    '@deepseek-ai/dsh-client-ui-slots',
+    '@deepseek-ai/dsh-client-ui-primitives',
+    '@deepseek-ai/dsh-client-ui-dockkit',
+  ]) {
+    loaded.set(spec, await import(spec) as Record<string, unknown>)
+  }
+  const { Context } = loaded.get('@deepseek-ai/cordis') as typeof import('@deepseek-ai/cordis')
+  const { SlotRegistry } = loadClientBundle('@deepseek-ai/dsh-client-runtime') as {
+    SlotRegistry: new (ctx: Context) => { register(def: unknown, render: () => null): void; entries(key: string): readonly { options: { id: string; order?: number; label?: unknown }; locale?: string }[] }
   }
 
   // 2. Load the built bundle the way the real loader does.
@@ -131,8 +178,21 @@ async function main(): Promise<number> {
   ctx.provide('sessions', { binding: () => undefined } as never)
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
   ctx.provide('remote', { $on: () => () => {} } as never)
-  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
-  const locale = await import('@deepseek-ai/dsh-client-locale/client')
+  // Minimal settings-scope stub: the lens view registers into the slot ring
+  // without reading settings, so the inert scope is enough here (the harness
+  // test runtime is no longer a dependency of this repo).
+  const inertScope = {
+    getSnapshot: () => ({
+      status: 'loading', value: undefined, base: undefined, user: undefined,
+      revision: undefined, writable: false, mode: 'host',
+    }),
+    subscribe: () => () => {},
+    mutate: () => Promise.resolve(),
+    set: () => Promise.resolve(),
+    unset: () => Promise.resolve(),
+  }
+  ctx.provide('settingsScope', { bind: () => inertScope } as never)
+  const locale = platformRequire('@deepseek-ai/dsh-client-locale') as typeof import('@deepseek-ai/dsh-client-locale/client')
   ctx.plugin({ inject: [...locale.inject], apply: locale.apply })
   const fiber = ctx.plugin(exports as { apply: (ctx: Context) => void })
   await fiber.await()

@@ -69,12 +69,12 @@ The plugin is an npm package with a single runtime dependency (`zod`); all `@dee
 dsh plugin --profile web add dsh-context-lens
 ```
 
-Developing from source: the published npm snapshot of the harness packages is incomplete (`@deepseek-ai/dsh-compact` and `@deepseek-ai/dsh-type-meta` are referenced but never published, and pnpm ≥ 10/11 auto-installs peers), so this repo vendors type-only copies of the nine `@deepseek-ai/dsh-*` packages under `vendor-stubs/` (dev-time, `lib/types` snapshots with sanitized `package.json`; only `dsh-llm` carries a 3-line runtime for its brand constructors). `@deepseek-ai/cordis` installs for real. See `IMPLEMENTATION_NOTES.md` → "npm snapshot gaps" for the full story.
+Developing from source: the harness packages install from the registry (since 0.1.5 the whole `@deepseek-ai/*` set is published, so the old `vendor-stubs/` type-only snapshots are gone). `autoInstallPeers` is on and `zod@^4` matches the framework contract. This plugin tracks the **0.1.5 harness contract**: projection units declare `stateSchema` + `wire`, the system prompt is tracked from `system/message` history nodes, and `CLIENT_EXTERNALS` mirrors the shell's new `PLATFORM_MODULES`. See `IMPLEMENTATION_NOTES.md` → "0.1.5 harness contract".
 
 ```sh
 pnpm install
 pnpm typecheck   # tsc --noEmit
-pnpm test        # vitest — 63 tests: fingerprint, cache math, diffing, projection lifecycle, step/end, replay consistency, formatting, determinism
+pnpm test        # vitest — 68 tests: fingerprint, cache math, diffing, projection lifecycle, step/end, replay consistency, formatting, determinism
 pnpm build       # tsc declarations → lib/types, tsdown → lib/index.js + lib/invariant.js + lib/client.js (browser, closure-factory ABI)
 ```
 
@@ -89,7 +89,6 @@ src/                 server: types, fingerprint, cache, diff, projection, index;
 src/client/          the conversation view + locales + CSS Modules
 tests/               vitest specs incl. the replay-consistency suite
 smoke/               real-runtime smokes: server, client ABI, GUI E2E
-vendor-stubs/        type-only vendored snapshots of the @deepseek-ai/dsh-* packages
 cordis.patch.yml     dsh bundle patch metadata
 ```
 

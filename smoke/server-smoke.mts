@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, {
-  CallId,
+  ToolCallId,
   LlmAdapter,
   createUserMessage,
   type GenerateOptions,
@@ -106,7 +106,7 @@ function textResponse(text: string, usage: TokenUsage): StreamChunk[] {
 }
 
 function toolCallResponse(callId: string, name: string, args: object, usage: TokenUsage): StreamChunk[] {
-  const id = CallId(callId)
+  const id = ToolCallId(callId)
   const argumentsJson = JSON.stringify(args)
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
@@ -214,7 +214,7 @@ async function main(): Promise<number> {
   check('contextLens key registered in the live registry', registered?.has('contextLens') ?? false)
 
   const echoDispose = ctx.tools.register(echo)
-  const agent = ctx.agentLoop.create(SessionId('lens-smoke'), { provider: 'mock', model: 'mock' })
+  const agent = await ctx.agentLoop.create(SessionId('lens-smoke'), { provider: 'mock', model: 'mock' })
 
   // Companion invariant plugin: mountable against the real invariants
   // service and registers the package name (no-op install).
@@ -257,7 +257,7 @@ async function main(): Promise<number> {
   await waitForIdle(ctx, agent)
 
   console.log('\n--- committed header events (shape check vs vendor types) ---')
-  const headerEvents = agent.session.events.filter(e => e.type === 'request/header')
+  const headerEvents = agent.session.snapshotEvents().filter(e => e.type === 'request/header')
   for (const event of headerEvents.slice(0, 3)) {
     const header = (event as { data: { header: unknown; reason: string } }).data
     console.log(`  reason=${header.reason} config=${JSON.stringify((header.header as { config: unknown }).config)}`)
@@ -345,11 +345,11 @@ async function main(): Promise<number> {
   let checkpointOk = false
   try {
     const rows = ctx.sessionProjections.checkpoint(agent.session)
-    checkpointOk = rows['contextLens']?.ver === 2 && rows['contextLens']?.seq === agent.session.seq - 1
+    checkpointOk = rows['contextLens']?.ver === 3 && rows['contextLens']?.seq === agent.session.seq - 1
   } catch (error) {
     console.log(`    checkpoint threw: ${String(error)}`)
   }
-  check('checkpoint row exists with stateVersion 2 at the current watermark', checkpointOk)
+  check('checkpoint row exists with stateVersion 3 at the current watermark', checkpointOk)
 
   sectionDispose()
   echoDispose()

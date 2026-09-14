@@ -67,7 +67,7 @@ dsh plugin --profile web add dsh-context-lens
 dsh plugin --profile web add dsh-context-lens
 ```
 
-从源码开发：harness 各包的 npm 快照不完整（`@deepseek-ai/dsh-compact` 与 `@deepseek-ai/dsh-type-meta` 被引用但从未发布，而 pnpm ≥ 10/11 会自动安装 peer），因此本仓库在 `vendor-stubs/` 下以类型专用（type-only）快照的形式 vendor 了九个 `@deepseek-ai/dsh-*` 包（仅 `lib/types` + 净化后的 `package.json`；`dsh-llm` 附带 3 行品牌构造器运行时）。`@deepseek-ai/cordis` 走真实安装。详见 `IMPLEMENTATION_NOTES.md` → "npm snapshot gaps"。
+从源码开发：自 0.1.5 起 `@deepseek-ai/*` 全套包都已发布，因此直接走 registry 安装（旧的 `vendor-stubs/` 类型快照已删除）；`autoInstallPeers` 打开，`zod@^4` 与框架契约一致。本插件跟踪 **0.1.5 harness 契约**：投影单元声明 `stateSchema` + `wire`，系统提示从 `system/message` 历史节点追踪，`CLIENT_EXTERNALS` 对齐 shell 新的 `PLATFORM_MODULES`。详见 `IMPLEMENTATION_NOTES.md` → "0.1.5 harness contract"。
 
 ```sh
 pnpm install
@@ -87,7 +87,6 @@ src/                服务端：types、fingerprint、cache、diff、projection�
 src/client/         会话视图 + 语言包 + CSS Modules
 tests/              vitest 用例（含重放一致性套件）
 smoke/              真实运行时冒烟：服务端、客户端 ABI、GUI E2E
-vendor-stubs/       @deepseek-ai/dsh-* 包的类型专用 vendor 快照
 cordis.patch.yml    dsh bundle patch 元数据
 ```
 

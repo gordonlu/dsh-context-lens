@@ -7,10 +7,11 @@ import {
   estimateSchemaTokens,
   estimateTextTokens,
   fingerprintHeader,
+  fingerprintSystem,
   hashText,
   hashValue,
 } from '../src/fingerprint.ts'
-import { epochHeader, textBlock, toolSchema } from './helpers.ts'
+import { epochHeader, systemMessage, textBlock, toolSchema } from './helpers.ts'
 
 describe('canonicalJson', () => {
   it('is stable across key order', () => {
@@ -67,18 +68,30 @@ describe('fingerprintHeader', () => {
     expect(fingerprintHeader(undefined)).toBe(EMPTY_HEADER)
   })
 
-  it('hashes config and system but never retains their text', () => {
-    const fingerprint = fingerprintHeader(epochHeader('you are helpful', []))
+  it('hashes the call config but never retains its text', () => {
+    const fingerprint = fingerprintHeader(epochHeader([]))
     expect(fingerprint.configHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(fingerprint.systemHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(fingerprint.systemBytes).toBe(Buffer.byteLength('you are helpful', 'utf8'))
+    // The system prompt is not a header field any more: the harness keeps it
+    // in history, so the header fingerprint never carries it.
+    expect(fingerprint.systemHash).toBeUndefined()
     expect(fingerprint.toolsHash).toBeUndefined()
     expect(fingerprint.toolCount).toBeUndefined()
+  })
+
+  it('hashes the model-visible system prompt but never retains its text', () => {
+    const fingerprint = fingerprintSystem(systemMessage([textBlock('you are helpful')]))
+    expect(fingerprint).not.toBeNull()
+    expect(fingerprint!.systemHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(fingerprint!.systemBytes).toBe(Buffer.byteLength(canonicalJson([textBlock('you are helpful')]), 'utf8'))
     expect(JSON.stringify(fingerprint)).not.toContain('helpful')
   })
 
+  it('reports no system fingerprint when the surface has no system prompt', () => {
+    expect(fingerprintSystem(undefined)).toBeNull()
+  })
+
   it('fingerprints each tool by name and canonical schema hash', () => {
-    const fingerprint = fingerprintHeader(epochHeader(undefined, [toolSchema('greet')]))
+    const fingerprint = fingerprintHeader(epochHeader([toolSchema('greet')]))
     const tool = fingerprint.tools[0]!
     expect(tool.name).toBe('greet')
     expect(tool.schemaHash).toMatch(/^[0-9a-f]{64}$/)
@@ -88,14 +101,14 @@ describe('fingerprintHeader', () => {
   })
 
   it('is stable when schema key order changes', () => {
-    const a = fingerprintHeader(epochHeader(undefined, [toolSchema('t', { properties: { a: {}, b: {} } })]))
-    const b = fingerprintHeader(epochHeader(undefined, [toolSchema('t', { properties: { b: {}, a: {} } })]))
+    const a = fingerprintHeader(epochHeader([toolSchema('t', { properties: { a: {}, b: {} } })]))
+    const b = fingerprintHeader(epochHeader([toolSchema('t', { properties: { b: {}, a: {} } })]))
     expect(a.tools[0]!.schemaHash).toBe(b.tools[0]!.schemaHash)
   })
 
   it('is distinct when the schema actually changes', () => {
-    const a = fingerprintHeader(epochHeader(undefined, [toolSchema('t', { properties: { a: {} } })]))
-    const b = fingerprintHeader(epochHeader(undefined, [toolSchema('t', { properties: { b: {} } })]))
+    const a = fingerprintHeader(epochHeader([toolSchema('t', { properties: { a: {} } })]))
+    const b = fingerprintHeader(epochHeader([toolSchema('t', { properties: { b: {} } })]))
     expect(a.tools[0]!.schemaHash).not.toBe(b.tools[0]!.schemaHash)
   })
 })

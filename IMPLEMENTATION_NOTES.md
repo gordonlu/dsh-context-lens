@@ -33,23 +33,66 @@ Engineering notes for dsh-context-lens v0.2. The READMEs carry the product story
 - `likelyCauses` is populated **only on a drop**, in fixed rule priority: model/provider → system → tools → config → surface growth → fallback. The view renders it with a "correlation, not causation" disclaimer.
 - The diff is computed once at finalization and stored on the record; it is never recomputed at render time.
 
-## npm snapshot gaps (why vendor-stubs exists)
+## Harness packages come from the registry
 
-The published `@deepseek-ai/*` registry snapshot is inconsistent:
+Until 0.1.5 the published `@deepseek-ai/*` snapshot was unusable: `dsh-compact`
+and `dsh-type-meta` were referenced by the client packages but never published,
+and pnpm ≥ 10/11 auto-installs peers. The workaround was nine **type-only
+vendored snapshots** under `vendor-stubs/`.
 
-- `@deepseek-ai/dsh-compact` (a dependency of `@deepseek-ai/dsh-client-runtime`, a peer of `dsh-client-ui-conversation`) and `@deepseek-ai/dsh-type-meta` (a peer of `dsh-client-runtime` and `dsh-session`) **do not exist on any registry** (npmjs and npmmirror both 404).
-- pnpm ≥ 10/11 auto-installs peer dependencies regardless of `auto-install-peers=false` (verified in a scratch project), and `pnpm.overrides` with `file:`/`link:` targets is ineffective when the target package cannot be resolved from the registry at all (verified in a second scratch project).
+**0.1.5-rc.2 publishes the whole set**, so `vendor-stubs/` is gone: the nine
+packages are ordinary devDependencies pinned to their published versions
+(`dsh-client-runtime` at `0.1.1-rc.2`, the rest at `0.1.5-rc.2`). Two settings
+keep the type surface usable:
 
-The workaround: **type-only vendored snapshots**. Each of the nine dev-time packages (`dsh-session`, `dsh-llm`, `dsh-session-projection`, `dsh-invariants`, `dsh-brand`, `dsh-client-locale`, `dsh-client-ui-slots`, `dsh-client-ui-conversation`, `dsh-client-runtime`) is vendored under `vendor-stubs/<name>/`:
+- `autoInstallPeers: true` (`pnpm-workspace.yaml`) — the client packages' peers
+  (`dsh-client-store`, `dsh-typert-protocol`, `dsh-api-remotes`, `dsh-scope`, …)
+  must resolve, or `skipLibCheck` silently degrades their declarations.
+- `zod@^4.4.3` — the projection contract is typed against zod 4
+  (`ZodType<T, ZodTypeDef, T>` vs zod 4's `$ZodTypeInternals`); zod 3 does not
+  satisfy `ProjectionDefinition.stateSchema`.
 
-- `lib/types/` copied verbatim from the published tarball (source of type truth, pinning `0.0.1-rc.1`; `dsh-invariants` pins `0.1.0-rc.6`).
-- `package.json` sanitized: **no** `dependencies`/`peerDependencies` (so pnpm never auto-installs the missing packages), exports map reduced to `types` conditions.
-- `dsh-llm` additionally ships a 3-line `runtime.js` (`MessageId`/`CallId`/`ProviderRequestId` identity constructors) because tests import the brand functions as values.
-- `skipLibCheck` suppresses unresolved imports inside the vendored `.d.ts` (verified in a scratch project on TypeScript 6.0.3). The type surface consumed (session event map, `EpochHeader`, `TokenUsage`, slot registration, `PropsLocale`, runtime props merge) was verified against the unpacked tarballs before writing the client code.
+**Why this mattered.** An unresolved import inside a vendored `.d.ts` does not
+fail the build — `skipLibCheck` swallows it and the declaration silently
+degrades. The harness's `SessionStandardProps` merge (which types
+`useSession`/`useProjection` for every session-scoped slot) lives in
+`dsh-client-runtime`'s client entry beside imports of a dozen packages the
+stubs did not carry, so `useSession` typechecked as `any`. The same silent
+degradation hid the 0.1.5 projection-contract break until the runtime failed.
 
-`@deepseek-ai/cordis@4.0.1` installs for real (its chain — cosmokit 1.8.2, cordis-plugin-loader 1.0.2, cordis-plugin-include 1.0.6 — is fully published). If the harness ever publishes the missing packages, the `file:` devDeps can be swapped back to registry ranges and `vendor-stubs/` deleted.
+## 0.1.5 harness contract (breaking, migrated in 0.3.0)
 
-Note: registry `dsh-session-projection` declares `zod@^4.4.3` while this project pins `zod@^3.23.8`; under `skipLibCheck` the mixed tree typechecks (verified), and the vendored stub has no zod dependency of its own.
+The 0.1.5 harness moved three things this plugin depends on. All three are
+migrated; nothing here is optional for a 0.1.5 host:
+
+1. **Projection units split host state from the client view.** A
+   `ProjectionDefinition` now declares `stateSchema` (validates the persisted
+   host state) and an optional `wire: { viewSchema, view }` (the client-facing
+   payload). `snapshot()` only emits units that declare `wire`; a unit with
+   only the old `schema`/`view` fields registers successfully but serves
+   nothing, which is exactly how the client went blank. `SessionProjectionMap`
+   (client values) and `SessionProjectionStateMap` (host state) are separate
+   merge-extensible tables and both must be augmented.
+2. **The system prompt left the request header.** `EpochHeader` is now
+   `{ config, adapterDefaults?, tools? }`; the model-visible prompt is a
+   `system/message` history node (the loop appends one per series and a later
+   node clears the earlier ones, so the newest node is the whole prompt). The
+   fold tracks it in `state.system` and merges the fingerprint into each
+   record's header at finalization, so `HeaderFingerprint` keeps its shape and
+   the diff is unchanged. `stateVersion` is 3 (persisted rows from the old
+   shape are discarded).
+3. **`assistant/chunk` is gone.** Usage rides `assistant/message`
+   (`{ turn, step, message, stream, usage?, interrupted? }`); a cancelled turn
+   finalizes its delivered prefix as an `interrupted` message, so "no message"
+   no longer identifies an abort — the turn's end reason does.
+
+Client side: the browser packages now ship as `window.__ModuleLoader__` handoff
+bundles (their `./client` entry is not an ES module), and the shell's platform
+table changed — `dsh-client-store` and `dsh-client-ui-dockkit` replaced
+`dsh-client-web-react`, `dsh-client-ui-attachment` and
+`dsh-client-schema-form`. `CLIENT_EXTERNALS` must equal the shell's
+`PLATFORM_MODULES` plus `dsh-client-runtime/client`; `smoke/client-smoke.mts`
+asserts exactly that against the shell source.
 
 ## Bundle ABI (tsdown.config.ts)
 

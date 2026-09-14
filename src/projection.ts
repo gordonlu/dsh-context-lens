@@ -26,13 +26,14 @@ import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { diffRequests } from './diff.ts'
 import { observeCache } from './cache.ts'
-import { estimateBlocksTokens, fingerprintHeader } from './fingerprint.ts'
+import { estimateBlocksTokens, fingerprintHeader, fingerprintSystem } from './fingerprint.ts'
 import type {
   ContextLensProjection,
   ContextLensSummary,
   HeaderFingerprint,
   RequestRecord,
   RequestUsage,
+  SystemFingerprint,
 } from './types.ts'
 
 /** The role-framing overhead priced into every surface message. */
@@ -77,6 +78,13 @@ export interface ContextLensState {
   /** Header fingerprint in force between requests (epoch semantics). */
   epoch: HeaderFingerprint | null
   epochContext?: { provider: string; model: string; contextWindow?: number }
+  /**
+   * Fingerprint of the model-visible system prompt in force. The harness keeps
+   * the prompt in history (a `system/message` node per series, a later node
+   * clearing the earlier ones), so it is tracked here and folded into each
+   * record's header rather than read from `request/header`.
+   */
+  system: SystemFingerprint | null
   /** Heuristic running total of every surface message so far (bytes → tokens). */
   surfaceCarry: number
 }
@@ -105,6 +113,12 @@ const headerFingerprintSchema = z.object({
   toolsHash: z.string().optional(),
   toolCount: z.number().int().nonnegative().optional(),
   tools: z.array(toolFingerprintSchema),
+}).strict()
+
+/** Fingerprint of the model-visible system prompt in force (hash + byte size). */
+const systemFingerprintSchema = z.object({
+  systemHash: z.string(),
+  systemBytes: z.number().int().nonnegative(),
 }).strict()
 
 const usageSchema = z.object({
@@ -179,6 +193,45 @@ const requestRecordSchema = z.object({
   diffFromPrevious: requestDiffSchema.optional(),
 }).strict()
 
+/** A `step/start` … `step/end` span still being observed (persisted as-is). */
+const pendingRequestSchema = z.object({
+  turn: z.number().int().positive(),
+  step: z.number().int().positive(),
+  seq: z.number().int().nonnegative(),
+  time: z.number(),
+  header: headerFingerprintSchema.nullable(),
+  contextWindow: z.number().int().positive().optional(),
+  sawMessage: z.boolean(),
+  stepEnded: z.boolean(),
+  usage: usageSchema.optional(),
+  surfaceAtStart: z.number().int().nonnegative(),
+  surfaceTokens: z.number().int().nonnegative(),
+  turnEnd: z.enum(['aborted', 'error', 'other']).optional(),
+}).strict()
+
+/**
+ * The unit's `stateSchema`: validates the persisted host state before it seeds
+ * a fold (the registry discards a row whose `stateVersion` differs). It covers
+ * the full retained window — the client-facing slice is `projectionSchema`.
+ */
+const contextLensStateSchema = z.object({
+  pending: pendingRequestSchema.nullable(),
+  last: requestRecordSchema.nullable(),
+  requests: z.array(requestRecordSchema),
+  totalRequests: z.number().int().nonnegative(),
+  cacheDrops: z.number().int().nonnegative(),
+  structuralChanges: z.number().int().nonnegative(),
+  lastDropOrdinal: z.number().int().nonnegative(),
+  epoch: headerFingerprintSchema.nullable(),
+  epochContext: z.object({
+    provider: z.string(),
+    model: z.string(),
+    contextWindow: z.number().int().positive().optional(),
+  }).strict().optional(),
+  system: systemFingerprintSchema.nullable(),
+  surfaceCarry: z.number().int().nonnegative(),
+}).strict() as unknown as z.ZodType<ContextLensState>
+
 const projectionSchema = z.object({
   latest: requestRecordSchema.optional(),
   recentRequests: z.array(requestRecordSchema),
@@ -204,29 +257,38 @@ const turnEndKindOf = (event: SessionEvent): TurnEndKind | undefined =>
 
 /** Build the finalized record for a completed step and fold it into the state. */
 function finalize(state: ContextLensState, pending: PendingRequest): ContextLensState {
-  const header = pending.header ?? state.epoch
+  const base = pending.header ?? state.epoch
+  // The system prompt is not part of `request/header` (the harness keeps it in
+  // history), so it rides in from the fold state — the record's header stays
+  // one comparable whole for the diff.
+  const header: HeaderFingerprint = {
+    ...base ?? { configHash: '', tools: [] },
+    ...state.system ?? {},
+  }
   const usage = pending.usage
-  const provider = header?.provider ?? state.epochContext?.provider
-  const model = header?.model ?? state.epochContext?.model
+  const provider = header.provider ?? state.epochContext?.provider
+  const model = header.model ?? state.epochContext?.model
   const record: RequestRecord = {
     id: `${pending.turn}:${pending.step}`,
     turn: pending.turn,
     step: pending.step,
     seq: pending.seq,
     time: pending.time,
-    // A message plus a closed step (`step/end`) or an ended turn finalizes
-    // completed; an aborted turn without a message is aborted; everything
-    // else — an error turn, or a crash-orphaned step with neither marker —
-    // is failed. The loop always emits `step/end` before `turn/end`, so an
-    // intermediate step of a multi-step turn finalizes at the next
-    // `step/start` with `stepEnded` set.
-    status: pending.sawMessage && (pending.turnEnd !== undefined || pending.stepEnded) ? 'completed'
-      : pending.turnEnd === 'aborted' ? 'aborted'
+    // An aborted turn is aborted even when the loop finalized the delivered
+    // prefix as a message (0.1.5 does exactly that, marking it `interrupted`),
+    // so the turn's own end reason wins. Otherwise a message plus a closed
+    // step (`step/end`) or an ended turn finalizes completed; everything else —
+    // an error turn, or a crash-orphaned step with neither marker — is failed.
+    // The loop always emits `step/end` before `turn/end`, so an intermediate
+    // step of a multi-step turn finalizes at the next `step/start` with
+    // `stepEnded` set.
+    status: pending.turnEnd === 'aborted' ? 'aborted'
+      : pending.sawMessage && (pending.turnEnd !== undefined || pending.stepEnded) ? 'completed'
         : 'failed',
     ...provider === undefined ? {} : { provider },
     ...model === undefined ? {} : { model },
     ...pending.contextWindow !== undefined ? { contextWindow: pending.contextWindow } : {},
-    header: header ?? { configHash: '', tools: [] },
+    header,
     ...usage === undefined ? {} : { usage },
     estimatedSurfaceTokens: pending.surfaceAtStart + pending.surfaceTokens,
     ...observeCacheSafe(usage, state.last?.usage),
@@ -262,14 +324,23 @@ function observeCacheSafe(
 }
 
 /**
+ * A client-visible unit's declaration. The registry's client-view overload
+ * requires `wire` to be present rather than merely allowed, while an
+ * explicitly annotated `ProjectionDefinition` widens it back to optional —
+ * this alias keeps the mandatory shape on the exported definition.
+ */
+type ClientVisibleDefinition = Omit<ProjectionDefinition<'contextLens', ContextLensState>, 'wire'>
+  & { wire: NonNullable<ProjectionDefinition<'contextLens', ContextLensState>['wire']> }
+
+/**
  * The `contextLens` projection unit. The fold is fully synchronous and pure;
  * uninteresting events return the same state reference (the registry's
- * zero-work `Object.is` gate).
+ * zero-work `Object.is` gate). The client reads it through the projection
+ * snapshot, so the `wire` view is mandatory.
  */
-export const contextLensProjectionDefinition:
-ProjectionDefinition<'contextLens', ContextLensState> = {
+export const contextLensProjectionDefinition: ClientVisibleDefinition = {
   key: 'contextLens',
-  schema: projectionSchema,
+  stateSchema: contextLensStateSchema,
   init: () => ({
     pending: null,
     last: null,
@@ -279,6 +350,7 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
     structuralChanges: 0,
     lastDropOrdinal: 0,
     epoch: null,
+    system: null,
     surfaceCarry: 0,
   }),
   apply: (state, event) => {
@@ -342,9 +414,12 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
           surfaceCarry: state.surfaceCarry + delta,
         }
       }
-      case 'assistant/chunk': {
-        if (event.data.chunk.type !== 'usage' || state.pending === null) return state
-        return { ...state, pending: { ...state.pending, usage: usageFrom(event.data.chunk.usage) } }
+      case 'system/message': {
+        // The harness keeps the system prompt in history: the loop appends one
+        // node per series, and a later node clears the earlier ones — so the
+        // newest node is the whole model-visible prompt from here on. The
+        // fingerprint is folded into each later record's header at finalization.
+        return { ...state, system: fingerprintSystem(event.data.message) }
       }
       case 'assistant/message': {
         if (state.pending === null) {
@@ -381,16 +456,22 @@ ProjectionDefinition<'contextLens', ContextLensState> = {
         return state
     }
   },
-  view: state => ({
-    ...state.last === null ? {} : { latest: state.last },
-    recentRequests: state.requests,
-    summary: {
-      totalRequests: state.totalRequests,
-      cacheDrops: state.cacheDrops,
-      structuralChanges: state.structuralChanges,
-      lastDropOrdinal: state.lastDropOrdinal,
-    },
-  }),
+  wire: {
+    viewSchema: projectionSchema,
+    view: state => ({
+      ...state.last === null ? {} : { latest: state.last },
+      recentRequests: state.requests,
+      summary: {
+        totalRequests: state.totalRequests,
+        cacheDrops: state.cacheDrops,
+        structuralChanges: state.structuralChanges,
+        lastDropOrdinal: state.lastDropOrdinal,
+      },
+    }),
+  },
   // 2: schemaBytes is UTF-8 byte length (was JS string length).
-  stateVersion: 2,
+  // 3: the system prompt moved out of the request header into history
+  //    (`system/message` nodes) — the fold tracks it separately, so persisted
+  //    state carries a `system` fingerprint that older rows do not.
+  stateVersion: 3,
 }

@@ -20,7 +20,7 @@
  * @module dsh-context-lens/projection
  */
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection';
-import type { HeaderFingerprint, RequestRecord, RequestUsage } from './types.ts';
+import type { HeaderFingerprint, RequestRecord, RequestUsage, SystemFingerprint } from './types.ts';
 /** How many finalized requests the retained window keeps (newest last). */
 export declare const MAX_RETAINED_REQUESTS = 100;
 /** How a turn ended — narrowed from `turn/end` for the status decision. */
@@ -61,13 +61,30 @@ export interface ContextLensState {
         model: string;
         contextWindow?: number;
     };
+    /**
+     * Fingerprint of the model-visible system prompt in force. The harness keeps
+     * the prompt in history (a `system/message` node per series, a later node
+     * clearing the earlier ones), so it is tracked here and folded into each
+     * record's header rather than read from `request/header`.
+     */
+    system: SystemFingerprint | null;
     /** Heuristic running total of every surface message so far (bytes → tokens). */
     surfaceCarry: number;
 }
 /**
+ * A client-visible unit's declaration. The registry's client-view overload
+ * requires `wire` to be present rather than merely allowed, while an
+ * explicitly annotated `ProjectionDefinition` widens it back to optional —
+ * this alias keeps the mandatory shape on the exported definition.
+ */
+type ClientVisibleDefinition = Omit<ProjectionDefinition<'contextLens', ContextLensState>, 'wire'> & {
+    wire: NonNullable<ProjectionDefinition<'contextLens', ContextLensState>['wire']>;
+};
+/**
  * The `contextLens` projection unit. The fold is fully synchronous and pure;
  * uninteresting events return the same state reference (the registry's
- * zero-work `Object.is` gate).
+ * zero-work `Object.is` gate). The client reads it through the projection
+ * snapshot, so the `wire` view is mandatory.
  */
-export declare const contextLensProjectionDefinition: ProjectionDefinition<'contextLens', ContextLensState>;
+export declare const contextLensProjectionDefinition: ClientVisibleDefinition;
 export {};

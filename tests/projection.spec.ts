@@ -6,8 +6,8 @@ import {
   epochHeader,
   ev,
   foldProjection,
-  streamChunkUsage,
   textBlock,
+  systemMessageEvent,
   toolResultMessage,
   toolSchema,
   turnEndReason,
@@ -15,9 +15,11 @@ import {
   userMessage,
 } from './helpers.ts'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { sessionHeader } from './helpers.ts'
 
-const headerA = epochHeader('system-a', [toolSchema('tool-a')])
-const headerB = epochHeader('system-b', [toolSchema('tool-b')])
+const headerA = epochHeader([toolSchema('tool-a')])
+const headerB = epochHeader([toolSchema('tool-b')])
 
 const startStep = (turn: number, step: number, seq: number) => ev('step/start', { turn, step }, { seq })
 
@@ -28,6 +30,7 @@ const message = (seq: number, turn: number, step: number, value: ReturnType<type
     turn,
     step,
     message: assistantMessage([textBlock('hello')]),
+    stream: [],
     usage: value,
   }, { seq })
 
@@ -35,6 +38,31 @@ const endTurn = (seq: number, turn: number, kind: 'completed' | 'aborted' | 'err
   ev('turn/end', { turn, reason: turnEndReason(kind) }, { seq })
 
 describe('contextLens projection: request lifecycle', () => {
+  it('folds the history-tracked system prompt into each record header', () => {
+    // The system prompt is a history node now, not a header field: the fold
+    // tracks the newest node and folds it into every later record's header, so
+    // a prompt change still shows up as a structural change.
+    const { view } = foldProjection([
+      systemMessageEvent('prompt-a', { seq: 1 }, 1, 1),
+      headerEvent(2),
+      startStep(1, 1, 3),
+      message(4, 1, 1, usage(100, 50)),
+      endTurn(5, 1),
+      // A newer node clears the earlier one — the whole effective prompt.
+      systemMessageEvent('prompt-b', { seq: 6 }, 2, 1),
+      headerEvent(7),
+      startStep(2, 1, 8),
+      message(9, 2, 1, usage(100, 50)),
+      endTurn(10, 2),
+    ])
+    const [first, second] = view.recentRequests
+    expect(first!.header.systemHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(first!.header.systemBytes).toBeGreaterThan(0)
+    expect(second!.header.systemHash).not.toBe(first!.header.systemHash)
+    expect(second!.diffFromPrevious?.system.changed).toBe(true)
+    expect(first!.diffFromPrevious).toBeUndefined()
+  })
+
   it('records one completed request per step with epoch header and usage', () => {
     const { view } = foldProjection([
       headerEvent(1),
@@ -83,7 +111,7 @@ describe('contextLens projection: request lifecycle', () => {
     const { view } = foldProjection([
       headerEvent(1),
       startStep(1, 1, 2),
-      ev('assistant/chunk', { turn: 1, step: 1, chunk: streamChunkUsage(usage(90, 10)) }, { seq: 3 }),
+      ev('assistant/attempt', { turn: 1, step: 1, stream: [] }, { seq: 3 }),
       headerEvent(4),
       message(5, 1, 1, usage(100, 50)),
       endTurn(6, 1),
@@ -103,7 +131,7 @@ describe('contextLens projection: request lifecycle', () => {
     const { view } = foldProjection([
       headerEvent(1),
       startStep(1, 1, 2),
-      ev('assistant/chunk', { turn: 1, step: 1, chunk: streamChunkUsage(usage(50, 5)) }, { seq: 3 }),
+      ev('assistant/attempt', { turn: 1, step: 1, stream: [] }, { seq: 3 }),
       ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
       endTurn(5, 1, 'error'),
       // Attempt 2: fresh turn, fresh step.
@@ -160,7 +188,7 @@ describe('contextLens projection: request lifecycle', () => {
   it('keeps usage absent (not zero) when the adapter reported none', () => {
     const { view } = foldProjection([
       startStep(1, 1, 1),
-      ev('assistant/message', { turn: 1, step: 1, message: assistantMessage([textBlock('hi')]) }, { seq: 2 }),
+      ev('assistant/message', { turn: 1, step: 1, message: assistantMessage([textBlock('hi')]), stream: [] }, { seq: 2 }),
       endTurn(3, 1),
     ])
     expect(view.latest!.usage).toBeUndefined()
@@ -192,7 +220,7 @@ describe('contextLens projection: step/end lifecycle (real loop shape)', () => {
     const { view } = foldProjection([
       headerEvent(1),
       startStep(1, 1, 2),
-      ev('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'partial' } }, { seq: 3 }),
+      ev('assistant/attempt', { turn: 1, step: 1, stream: [] }, { seq: 3 }),
       ev('step/end', { turn: 1, step: 1 }, { seq: 4 }),
       endTurn(5, 1, 'aborted'),
     ])
@@ -317,7 +345,7 @@ describe('contextLens projection: retention and counters', () => {
 
   it('returns the same state reference for uninteresting events', () => {
     const first = foldProjection([headerEvent(1)])
-    const untouched = contextLensProjectionDefinition.apply(first.state, ev('todo/write', { todos: [] }, { seq: 2 }))
+    const untouched = contextLensProjectionDefinition.apply(first.state, ev('turn/start', { turn: 1 }, { seq: 2 }))
     expect(untouched).toBe(first.state)
   })
 })
@@ -337,28 +365,28 @@ describe('contextLens projection: replay consistency', () => {
     ev('request/context', { provider: 'deepseek', model: 'deepseek-chat' }, { seq: 2 }),
     startStep(1, 1, 3),
     ev('user/message', userMessage([textBlock('a'.repeat(400))]), { seq: 4 }),
-    ev('assistant/chunk', { turn: 1, step: 1, chunk: streamChunkUsage(usage(90, 10)) }, { seq: 5 }),
+    ev('assistant/attempt', { turn: 1, step: 1, stream: [] }, { seq: 5 }),
     headerEvent(6),
     message(7, 1, 1, usage(100, 50, { cacheReadTokens: 900 })),
     endTurn(8, 1),
     // Second step of the same turn, tool set extended + one schema changed.
-    headerEvent(9, epochHeader('system-a', [toolSchema('tool-b'), toolSchema('tool-a', { extra: true })])),
+    headerEvent(9, epochHeader([toolSchema('tool-b'), toolSchema('tool-a', { extra: true })])),
     startStep(1, 2, 10),
     message(11, 1, 2, usage(1000, 100)),
     endTurn(12, 1, 'aborted'),
     // Model + provider + config change; usage arrives only on the final message.
     headerEvent(13, { config: { provider: 'openrouter', model: 'other-model' }, tools: [toolSchema('tool-a')] }),
     startStep(2, 1, 14),
-    ev('assistant/message', { turn: 2, step: 1, message: assistantMessage([textBlock('no usage yet')]) }, { seq: 15 }),
+    ev('assistant/message', { turn: 2, step: 1, message: assistantMessage([textBlock('no usage yet')]), stream: [] }, { seq: 15 }),
     message(16, 2, 1, usage(200, 60, { cacheReadTokens: 300 })),
     endTurn(17, 2, 'error'),
     // Missing usage entirely.
-    headerEvent(18, epochHeader('system-a', [toolSchema('x'), toolSchema('y')])),
+    headerEvent(18, epochHeader([toolSchema('x'), toolSchema('y')])),
     startStep(3, 1, 19),
-    ev('assistant/message', { turn: 3, step: 1, message: assistantMessage([textBlock('no accounting')]) }, { seq: 20 }),
+    ev('assistant/message', { turn: 3, step: 1, message: assistantMessage([textBlock('no accounting')]), stream: [] }, { seq: 20 }),
     endTurn(21, 3),
     // Tool order changed with identical set and schemas.
-    headerEvent(22, epochHeader('system-a', [toolSchema('y'), toolSchema('x')])),
+    headerEvent(22, epochHeader([toolSchema('y'), toolSchema('x')])),
     startStep(4, 1, 23),
     message(24, 4, 1, usage(100, 50)),
     endTurn(25, 4),
@@ -370,18 +398,18 @@ describe('contextLens projection: replay consistency', () => {
   it('produces identical state and view under live and replay folds', () => {
     const log = scenarioLog()
     const replayed = foldProjection(log)
-    let live: ContextLensState = contextLensProjectionDefinition.init()
+    let live: ContextLensState = contextLensProjectionDefinition.init(sessionHeader(), SessionLogOffset(0))
     for (const event of log) {
       live = contextLensProjectionDefinition.apply(live, event)
     }
     expect(live).toEqual(replayed.state)
-    expect(contextLensProjectionDefinition.view(live)).toEqual(replayed.view)
+    expect(contextLensProjectionDefinition.wire.view(live)).toEqual(replayed.view)
   })
 
   it('produces identical state when the log is folded in chunks', () => {
     const log = scenarioLog()
     const whole = foldProjection(log)
-    let partial: ContextLensState = contextLensProjectionDefinition.init()
+    let partial: ContextLensState = contextLensProjectionDefinition.init(sessionHeader(), SessionLogOffset(0))
     for (const event of log.slice(0, 7)) partial = contextLensProjectionDefinition.apply(partial, event)
     for (const event of log.slice(7)) partial = contextLensProjectionDefinition.apply(partial, event)
     expect(partial).toEqual(whole.state)
@@ -414,11 +442,14 @@ describe('contextLens projection: replay consistency', () => {
     expect(fifth.diffFromPrevious!.tools.changed).toBe(true)
   })
 
-  it('decides statuses from the step events: message beats abort, then abort beats failure', () => {
+  it('decides statuses from the step events: an aborted turn reads aborted, a failed one failed', () => {
+    // 0.1.5 finalizes a cancelled turn's delivered prefix as an
+    // `interrupted` message, so "no message" no longer identifies an abort —
+    // the turn's own end reason does.
     const { view } = foldProjection(scenarioLog())
     const byId = new Map(view.recentRequests.map(request => [request.id, request]))
     expect(byId.get('1:1')!.status).toBe('completed')
-    expect(byId.get('1:2')!.status).toBe('completed')
+    expect(byId.get('1:2')!.status).toBe('aborted')
     expect(byId.get('2:1')!.status).toBe('completed')
     expect(byId.get('3:1')!.status).toBe('completed')
     expect(byId.get('4:1')!.status).toBe('completed')
@@ -433,20 +464,21 @@ describe('contextLens projection: replay consistency', () => {
     // Regression: the strict toolsDiffSchema once rejected the emitted
     // `orderChanged` field (caught by the real-runtime smoke).
     const { view } = foldProjection(scenarioLog())
-    expect(() => contextLensProjectionDefinition.schema.parse(view)).not.toThrow()
-    const noDiff = contextLensProjectionDefinition.view(foldProjection([
-      ev('request/header', { header: epochHeader('system', [toolSchema('tool-a')]), reason: 'initial' }, { seq: 1 }),
+    expect(() => contextLensProjectionDefinition.wire.viewSchema.parse(view)).not.toThrow()
+    const noDiff = contextLensProjectionDefinition.wire.view(foldProjection([
+      ev('request/header', { header: epochHeader([toolSchema('tool-a')]), reason: 'initial' }, { seq: 1 }),
       ev('request/context', { provider: 'p', model: 'm', contextWindow: 4096 }, { seq: 2 }),
       ev('step/start', { turn: 1, step: 1 }, { seq: 3 }),
       ev('assistant/message', {
         turn: 1,
         step: 1,
         message: assistantMessage([textBlock('ok')]),
+        stream: [],
         usage: usage(100, 10),
       }, { seq: 4 }),
       ev('turn/end', { turn: 1, reason: turnEndReason('completed') }, { seq: 5 }),
     ]).state)
-    expect(() => contextLensProjectionDefinition.schema.parse(noDiff)).not.toThrow()
+    expect(() => contextLensProjectionDefinition.wire.viewSchema.parse(noDiff)).not.toThrow()
   })
 })
 

@@ -6,9 +6,9 @@
  *
  * @module dsh-context-lens/fingerprint
  */
-import type { ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm';
+import type { ContentBlock, SystemMessage, ToolSchema } from '@deepseek-ai/dsh-llm';
 import type { EpochHeader } from '@deepseek-ai/dsh-session';
-import type { HeaderFingerprint } from './types.ts';
+import type { HeaderFingerprint, SystemFingerprint } from './types.ts';
 /** Fixed text-density heuristic, mirroring the harness token-meter's pricing. */
 export declare const CHARS_PER_TOKEN = 4;
 /** Per-block structural overhead for JSON framing and type tags. */
@@ -64,10 +64,25 @@ export declare function estimateBlocksTokens(blocks: readonly ContentBlock[]): n
 export declare const EMPTY_HEADER: HeaderFingerprint;
 /**
  * Reduce a canonical request header to its fingerprint. `undefined` (a
- * header-less log) yields {@link EMPTY_HEADER}. The system text is hashed and
- * measured in bytes; every tool is fingerprinted individually, and the tool
- * set carries a whole-set hash for O(1) change detection.
+ * header-less log) yields {@link EMPTY_HEADER}. The header carries the call
+ * config and the assembled tool set only — the model-visible system prompt is
+ * not part of it (the harness keeps it in history; see
+ * {@link fingerprintSystem}). Every tool is fingerprinted individually, and
+ * the tool set carries a whole-set hash for O(1) change detection.
  * @param header - the canonical header, or undefined before any request.
  * @returns the fingerprint.
  */
 export declare function fingerprintHeader(header: EpochHeader | undefined): HeaderFingerprint;
+/**
+ * Fingerprint the model-visible system message in force for a request. The
+ * harness keeps the system prompt in history (`SystemPromptUpdate =
+ * 'in-history'`): the loop appends a `system/message` when a series starts,
+ * and a later node clears the earlier ones, so the newest node is the whole
+ * effective prompt. Only a content hash and its canonical byte size are
+ * retained — never the prompt text.
+ * @param message - the newest `system/message` payload, or undefined when the
+ *   model-visible surface has no system prompt.
+ * @returns the fingerprint, or null when no system prompt is in force (the
+ *   record's header then carries no `systemHash` at all).
+ */
+export declare function fingerprintSystem(message: SystemMessage | undefined): SystemFingerprint | null;

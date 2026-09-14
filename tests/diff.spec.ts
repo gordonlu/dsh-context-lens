@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { diffRequests, likelyCauses } from '../src/diff.ts'
 import type { RequestDiff, RequestRecord } from '../src/types.ts'
-import { fingerprintHeader } from '../src/fingerprint.ts'
+import { fingerprintHeader, hashText } from '../src/fingerprint.ts'
 import { epochHeader, toolSchema, usage } from './helpers.ts'
 
 function record(overrides: Partial<RequestRecord> = {}): RequestRecord {
-  const header = fingerprintHeader(epochHeader('system', []))
+  const header = fingerprintHeader(epochHeader([]))
   return {
     id: '1:1',
     turn: 1,
@@ -58,11 +58,17 @@ describe('diffRequests', () => {
   })
 
   it('detects system prompt changes with byte sizes', () => {
-    const before = record()
-    const after = record({
-      header: fingerprintHeader(epochHeader('different system', [])),
+    // The projection folds the history-tracked system prompt into each
+    // record's header (hash + canonical byte size), so a system change is
+    // exactly a change of that overlay.
+    const withSystem = (text: string): ReturnType<typeof record> => record({
+      header: {
+        ...fingerprintHeader(epochHeader([])),
+        systemHash: hashText(text),
+        systemBytes: Buffer.byteLength(text, 'utf8'),
+      },
     })
-    const diff = diffRequests(before, after)
+    const diff = diffRequests(withSystem('system'), withSystem('different system'))
     expect(diff.system.changed).toBe(true)
     expect(diff.system.beforeBytes).toBe(Buffer.byteLength('system', 'utf8'))
     expect(diff.system.afterBytes).toBe(Buffer.byteLength('different system', 'utf8'))
@@ -70,10 +76,10 @@ describe('diffRequests', () => {
 
   it('classifies tools by name into added, removed, and modified', () => {
     const before = record({
-      header: fingerprintHeader(epochHeader(undefined, [toolSchema('kept'), toolSchema('gone')])),
+      header: fingerprintHeader(epochHeader([toolSchema('kept'), toolSchema('gone')])),
     })
     const after = record({
-      header: fingerprintHeader(epochHeader(undefined, [toolSchema('kept', { extra: true }), toolSchema('new')])),
+      header: fingerprintHeader(epochHeader([toolSchema('kept', { extra: true }), toolSchema('new')])),
     })
     const diff = diffRequests(before, after)
     expect(diff.tools.changed).toBe(true)
@@ -84,10 +90,10 @@ describe('diffRequests', () => {
 
   it('reports orderChanged when the identical tool set is declared in a different order', () => {
     const before = record({
-      header: fingerprintHeader(epochHeader(undefined, [toolSchema('alpha'), toolSchema('beta')])),
+      header: fingerprintHeader(epochHeader([toolSchema('alpha'), toolSchema('beta')])),
     })
     const after = record({
-      header: fingerprintHeader(epochHeader(undefined, [toolSchema('beta'), toolSchema('alpha')])),
+      header: fingerprintHeader(epochHeader([toolSchema('beta'), toolSchema('alpha')])),
     })
     const diff = diffRequests(before, after)
     expect(diff.tools.added).toEqual([])
@@ -99,8 +105,8 @@ describe('diffRequests', () => {
 
   it('does not report orderChanged when the order is identical', () => {
     const diff = diffRequests(
-      record({ header: fingerprintHeader(epochHeader(undefined, [toolSchema('alpha'), toolSchema('beta')])) }),
-      record({ header: fingerprintHeader(epochHeader(undefined, [toolSchema('alpha'), toolSchema('beta')])) }),
+      record({ header: fingerprintHeader(epochHeader([toolSchema('alpha'), toolSchema('beta')])) }),
+      record({ header: fingerprintHeader(epochHeader([toolSchema('alpha'), toolSchema('beta')])) }),
     )
     expect(diff.tools.orderChanged).toBe(false)
     expect(diff.tools.changed).toBe(false)
@@ -108,12 +114,12 @@ describe('diffRequests', () => {
 
   it('ignores tool schema key order inside a schema', () => {
     const before = record({
-      header: fingerprintHeader(epochHeader(undefined, [
+      header: fingerprintHeader(epochHeader([
         toolSchema('t', { parameters: { type: 'object', properties: { a: {}, b: {} } } }),
       ])),
     })
     const after = record({
-      header: fingerprintHeader(epochHeader(undefined, [
+      header: fingerprintHeader(epochHeader([
         toolSchema('t', { parameters: { type: 'object', properties: { b: {}, a: {} } } }),
       ])),
     })

@@ -6,16 +6,17 @@
 import type {
   AssistantMessage,
   ContentBlock,
-  StreamChunk,
+  SystemMessage,
   TokenUsage,
   ToolResultMessage,
   ToolSchema,
   UserMessage,
 } from '@deepseek-ai/dsh-llm'
-import { CallId, MessageId } from '@deepseek-ai/dsh-llm'
+import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContextLensProjection } from '../src/types.ts'
 import { contextLensProjectionDefinition, type ContextLensState } from '../src/projection.ts'
-import type { EpochHeader, SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
+import type { EpochHeader, SessionEvent, SessionHeader, TurnEndReason } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 
 export function textBlock(text: string): ContentBlock {
   return { type: 'text', text }
@@ -39,12 +40,27 @@ export function assistantMessage(content: readonly ContentBlock[]): AssistantMes
   }
 }
 
+/**
+ * The model-visible system prompt as the harness commits it: a history node,
+ * not a header field.
+ * @param content - the prompt's blocks.
+ * @returns the system message.
+ */
+export function systemMessage(content: readonly ContentBlock[]): SystemMessage {
+  return {
+    id: MessageId('s1'),
+    role: 'system',
+    content: [...content],
+    source: { kind: 'plugin', plugin: 'test' },
+  }
+}
+
 export function toolResultMessage(toolCallId: string, content: readonly ContentBlock[]): ToolResultMessage {
   return {
     id: MessageId('t1'),
     role: 'user',
-    content: [{ type: 'tool-result', toolCallId: CallId(toolCallId), content: [...content] }],
-    source: { kind: 'tool', callId: CallId(toolCallId) },
+    content: [{ type: 'tool-result', toolCallId: ToolCallId(toolCallId), content: [...content] }],
+    source: { kind: 'tool', callId: ToolCallId(toolCallId) },
   }
 }
 
@@ -56,18 +72,21 @@ export function usage(
   return { inputTokens, outputTokens, ...extra }
 }
 
-export function streamChunkUsage(value: TokenUsage): StreamChunk {
-  return { type: 'usage', usage: value }
-}
-
 export function toolSchema(name: string, extra: Record<string, unknown> = {}): ToolSchema {
   return { name, description: `${name} does work`, parameters: { type: 'object', properties: {}, ...extra } }
 }
 
-export function epochHeader(system: string | undefined, tools: ToolSchema[]): EpochHeader {
+/**
+ * A canonical request header: the call config plus the assembled tool set.
+ * The model-visible system prompt is deliberately absent — the harness keeps
+ * it in history as a `system/message` node, which the projection tracks
+ * separately and folds into each record's header.
+ * @param tools - the assembled tool schemas; omit for a tool-less request.
+ * @returns the header.
+ */
+export function epochHeader(tools: ToolSchema[] = []): EpochHeader {
   return {
     config: { provider: 'deepseek', model: 'deepseek-chat' },
-    ...system === undefined ? {} : { system },
     ...tools.length === 0 ? {} : { tools },
   }
 }
@@ -92,14 +111,34 @@ export function ev<T extends SessionEvent['type']>(
   return { type, seq: shell.seq, time: shell.time ?? 0, data } as Extract<SessionEvent, { type: T }>
 }
 
+/** A committed `system/message` node carrying the model-visible prompt. */
+export function systemMessageEvent(
+  text: string,
+  shell: EventShell = { seq: 0 },
+  turn = 1,
+  step = 1,
+): Extract<SessionEvent, { type: 'system/message' }> {
+  return ev('system/message', { turn, step, message: systemMessage([textBlock(text)]) }, shell)
+}
+
+/** Immutable session metadata the projection's `init` folds from. */
+export function sessionHeader(): SessionHeader {
+  return {
+    version: SESSION_FORMAT_VERSION,
+    id: SessionId('lens-test'),
+    createdAt: 0,
+    isSeeded: false,
+  }
+}
+
 /** Fold a full drive (header → step → message → turn end) into the projection. */
 export function foldProjection(events: readonly SessionEvent[]): {
   state: ContextLensState
   view: ContextLensProjection
 } {
-  let state = contextLensProjectionDefinition.init()
+  let state = contextLensProjectionDefinition.init(sessionHeader(), SessionLogOffset(0))
   for (const event of events) {
     state = contextLensProjectionDefinition.apply(state, event)
   }
-  return { state, view: contextLensProjectionDefinition.view(state) }
+  return { state, view: contextLensProjectionDefinition.wire.view(state) }
 }

@@ -7,6 +7,18 @@
  *
  * @module dsh-context-lens/types
  */
+import type { ContextLensState } from './projection.ts';
+/**
+ * Identity of the model-visible system prompt in force for a request: the
+ * content hash and its canonical UTF-8 byte size. The prompt text itself is
+ * never retained. The harness keeps the prompt in history rather than in the
+ * request header, so this rides the record's header fingerprint as an
+ * overlay — the record's `header` stays one comparable whole.
+ */
+export interface SystemFingerprint {
+    systemHash: string;
+    systemBytes: number;
+}
 /**
  * One tool's identity fingerprint: stable name, canonical schema hash, byte
  * size, and a heuristic token estimate. The schema text itself is never
@@ -168,5 +180,15 @@ export interface RequestRecord {
 declare module '@deepseek-ai/dsh-session-projection/types' {
     interface SessionProjectionMap {
         contextLens: ContextLensProjection;
+    }
+    /**
+     * The host fold-state table. The harness split client views
+     * (`SessionProjectionMap`) from host state: a unit declares `stateSchema`
+     * over this entry and, when it has a client view, a `wire` payload over the
+     * entry above. `contextLens` declares both — the host state is the full
+     * retained window, the wire payload is the client-facing slice.
+     */
+    interface SessionProjectionStateMap {
+        contextLens: ContextLensState;
     }
 }

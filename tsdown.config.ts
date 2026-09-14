@@ -26,7 +26,10 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 /**
  * Module-table entries the browser loader answers natively: the platform
- * seed modules plus the runtime exemption. Everything else inlines.
+ * seed modules plus the runtime exemption. Everything else inlines. The list
+ * is the shell's `PLATFORM_MODULES` (plus `dsh-client-runtime/client`); a key
+ * the seed table cannot answer is a guaranteed miss-table throw at runtime,
+ * and the smoke asserts this list against the shell source.
  */
 export const CLIENT_EXTERNALS: readonly string[] = [
   'react',
@@ -34,11 +37,10 @@ export const CLIENT_EXTERNALS: readonly string[] = [
   'react-dom',
   'react-dom/client',
   '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-web-react',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-schema-form',
+  '@deepseek-ai/dsh-client-ui-dockkit',
   '@deepseek-ai/dsh-client-runtime/client',
 ]
 

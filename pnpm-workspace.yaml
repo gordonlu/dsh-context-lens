@@ -1,5 +1,9 @@
 settings:
-  autoInstallPeers: false
+  # The nine harness packages are consumed as real registry packages now that
+  # they publish (vendor-stubs is gone), so their peers must resolve for the
+  # types to be usable — skipLibCheck silently degrades an unresolved import,
+  # which is exactly how a stale stub hid the 0.1.5 projection-contract break.
+  autoInstallPeers: true
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/cordis@4.0.1'

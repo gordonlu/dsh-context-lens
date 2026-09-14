@@ -2,7 +2,8 @@
 
 These scripts close the handover's §5 gap: every ABI conclusion that used to
 come from unpacked npm tarballs and code review is now exercised against the
-REAL harness packages from a local checkout (not the vendored type stubs).
+REAL harness packages from a local checkout (not the type stubs the repo used
+before 0.1.5 published the whole `@deepseek-ai/*` set).
 
 They need a harness checkout on this machine (the same one the GUI runs
 from), because:
@@ -22,15 +23,18 @@ TSX="$HARNESS/node_modules/.bin/tsx"
 # the REAL AgentLoop. 54 assertions; JSON dump in smoke/out/projection.json.
 "$TSX" --tsconfig "$HARNESS/tsconfig.json" smoke/server-smoke.mts
 
-# Browser half: lib/client.js loaded exactly like the real loader does,
-# externals resolved against the shell's real PLATFORM_MODULES table
-# (conformance-asserted), then mounted into a REAL SlotRegistry + the real
-# locale plugin. 12 assertions.
+# Browser half: lib/client.js loaded exactly like the real loader does. Since
+# 0.1.5 the browser packages are `window.__ModuleLoader__` handoff bundles, so
+# the smoke drives that contract for them too (the platform packages whose
+# sources import CSS are loaded as ES modules first — a bundle factory's
+# require is synchronous — and then served from the loader table). Externals
+# are conformance-asserted against the shell's real PLATFORM_MODULES table,
+# and the plugin is mounted into a REAL SlotRegistry + the real locale plugin.
 DSH_SMOKE_HARNESS="$HARNESS" \
   "$TSX" --tsconfig "$HARNESS/tsconfig.json" smoke/client-smoke.mts
 ```
 
-Both exit non-zero on the first failing run's assertion count. `css-hook.mjs`
+Both print `SMOKE PASS` / `CLIENT SMOKE PASS` and exit non-zero on failure. `css-hook.mjs`
 is a node loader hook that lets plain node import real client packages whose
 sources carry `*.module.css` (their build pipeline inlines CSS; node cannot).
 

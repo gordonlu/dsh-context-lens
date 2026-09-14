@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { chatNodeCount } from './chat-node-count.ts'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { globalOrdinal } from './request-summary.ts'
@@ -30,8 +31,10 @@ export function ContextView(props: ContextLensViewProps) {
   const rootRef = useRef<HTMLElement | null>(null)
 
   // Track conversation growth while the lens panel is open: switching back to
-  // Chat scrolls to the latest message only when new nodes appeared.
-  const nodeCount = useSession(snapshot => snapshot.nodes.length)
+  // Chat scrolls to the latest message only when new nodes appeared. The read
+  // is defensive — see chat-node-count.ts for why this hook's type cannot be
+  // trusted for the snapshot shape.
+  const nodeCount = useSession(chatNodeCount)
   const nodeCountRef = useRef(0)
   useEffect(() => {
     nodeCountRef.current = nodeCount

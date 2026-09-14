@@ -70,7 +70,13 @@ const cssModulesPlugin: CssModulesPlugin = {
       minify: true,
     })
     const classMap: Record<string, string> = {}
-    for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+    // Sort by local name. lightningcss returns the exports map in an unstable
+    // order, and an unstable key order rebuilt a byte-different (equivalent)
+    // lib/client.js on every build — enough to dirty the working tree and fail
+    // `pnpm publish`'s clean-tree check.
+    for (const [local, exp] of Object.entries(cssExports ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+      classMap[local] = exp.name
+    }
     // One <style data-plugin> per module file; idempotent under re-evaluation.
     const id = 'dsh-context-lens'
     return [
